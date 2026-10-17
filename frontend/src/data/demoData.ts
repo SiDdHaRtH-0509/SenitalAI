@@ -8,7 +8,7 @@
  * They are NOT live surveillance events.
  */
 
-import {
+import type {
   SecurityEvent,
   DashboardStatistics,
   SystemHealthState,

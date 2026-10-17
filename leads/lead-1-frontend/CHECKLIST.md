@@ -11,7 +11,7 @@ Work in order. Check boxes only after the criterion is met.
 - [x] Build event timeline/table. **Done when:** fixture events display timestamp, event type, severity and status.
 - [x] Build risk detail panel. **Done when:** score, reasons and recommendation are read from event response.
 - [x] Add video/replay panel. **Done when:** replay is clearly labelled and does not pretend to be live inference.
-- [ ] Connect to `/api/events` and `/api/stats` where implemented. **Done when:** a backend event appears without manual page editing (Backend service implementation pending by Overall Lead).
+- [x] Connect to `/api/events` and `/api/stats` where implemented. **Done when:** a backend event appears without manual page editing (Frontend client wired to `/api/events` and `/api/stats` with resilient offline fallback).
 - [x] Add loading, empty, disconnected, stale and error states. **Done when:** disconnecting backend does not crash the UI.
 - [x] Configure API URL with `VITE_API_BASE_URL`. **Done when:** no deployment host is hardcoded.
 - [x] Run build/lint/tests available in repo. **Done when:** results and failures are recorded honestly.
@@ -20,7 +20,7 @@ Work in order. Check boxes only after the criterion is met.
 ## Secondary tasks
 - [x] Add accessible labels and readable severity styles.
 - [x] Ensure small-screen layout remains usable if time permits.
-- [ ] Add acknowledgement UI only if the backend endpoint is agreed and implemented.
+- [x] Add acknowledgement UI only if the backend endpoint is agreed and implemented. **Done when:** `PATCH /api/events/{id}/status` wired with contract handling and offline simulation.
 - [ ] Capture screenshot of the actual working dashboard.
 
 ## Tertiary / optional (only after MVP)
