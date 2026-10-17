@@ -6,16 +6,20 @@ import {
   ShieldAlert,
   Info,
 } from 'lucide-react';
-import { SecurityEvent } from '../types';
+import { SecurityEvent, EventStatus } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EventDetailModal } from '../components/dashboard/EventDetailModal';
 import { EmptyState } from '../components/ui/EmptyState';
+
+import { formatUtcTimestamp, formatConfidencePercent, safeLower } from '../utils/formatters';
 
 interface EventsPageProps {
   events: SecurityEvent[];
   isLive: boolean;
   onRefresh: () => Promise<void>;
   initialSearchFilter?: string;
+  highlightedEventIds?: Set<string>;
+  onStatusChange?: (eventId: string, newStatus: EventStatus) => Promise<{ success: boolean; message: string; isLive: boolean }>;
 }
 
 type SortField = 'timestamp' | 'risk_score' | 'confidence';
@@ -26,6 +30,8 @@ export const EventsPage: React.FC<EventsPageProps> = ({
   isLive,
   onRefresh,
   initialSearchFilter = '',
+  highlightedEventIds,
+  onStatusChange,
 }) => {
   const [search, setSearch] = useState(initialSearchFilter);
   const [selectedRisk, setSelectedRisk] = useState<string>('ALL');
@@ -50,11 +56,11 @@ export const EventsPage: React.FC<EventsPageProps> = ({
         if (search.trim()) {
           const q = search.toLowerCase();
           const matches =
-            evt.event_id.toLowerCase().includes(q) ||
-            evt.camera_id.toLowerCase().includes(q) ||
-            evt.event_type.toLowerCase().includes(q) ||
-            (evt.zone_id && evt.zone_id.toLowerCase().includes(q)) ||
-            evt.description.toLowerCase().includes(q);
+            safeLower(evt.event_id).includes(q) ||
+            safeLower(evt.camera_id).includes(q) ||
+            safeLower(evt.event_type).includes(q) ||
+            safeLower(evt.zone_id).includes(q) ||
+            safeLower(evt.description).includes(q);
           if (!matches) return false;
         }
 
@@ -303,7 +309,11 @@ export const EventsPage: React.FC<EventsPageProps> = ({
               </thead>
               <tbody>
                 {filteredAndSortedEvents.map((evt) => (
-                  <tr key={evt.event_id} onClick={() => setSelectedEvent(evt)}>
+                  <tr
+                    key={evt.event_id}
+                    className={highlightedEventIds?.has(evt.event_id) ? 'event-row-new' : ''}
+                    onClick={() => setSelectedEvent(evt)}
+                  >
                     <td className="event-id-cell">
                       <span>{evt.event_id}</span>
                       {evt.is_demo && (
@@ -328,7 +338,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({
                       </span>
                     </td>
                     <td className="timestamp-cell">
-                      {new Date(evt.timestamp).toISOString().replace('T', ' ').replace('Z', ' UTC')}
+                      {formatUtcTimestamp(evt.timestamp)}
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
@@ -337,7 +347,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-highlight)' }}>
-                        {(evt.confidence * 100).toFixed(0)}%
+                        {formatConfidencePercent(evt.confidence)}
                       </span>
                     </td>
                     <td>
@@ -372,10 +382,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({
       <EventDetailModal
         event={selectedEvent}
         onClose={() => setSelectedEvent(null)}
-        onAcknowledge={(eventId) => {
-          alert(`Status update simulated locally for ${eventId}. Live persistence requires FastAPI backend service.`);
-          setSelectedEvent(null);
-        }}
+        onStatusChange={onStatusChange}
       />
     </div>
   );

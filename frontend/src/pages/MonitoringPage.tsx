@@ -4,6 +4,7 @@ import { CameraInfo } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { CameraDetailModal } from '../components/dashboard/CameraDetailModal';
 import { EmptyState } from '../components/ui/EmptyState';
+import { safeLower } from '../utils/formatters';
 
 interface MonitoringPageProps {
   cameras: CameraInfo[];
@@ -30,12 +31,13 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
   };
 
   const filteredCameras = cameras.filter((cam) => {
+    const q = searchFilter.trim().toLowerCase();
     const matchesSearch =
-      !searchFilter.trim() ||
-      cam.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      cam.camera_id.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      cam.location.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      cam.zone_id.toLowerCase().includes(searchFilter.toLowerCase());
+      !q ||
+      safeLower(cam.name).includes(q) ||
+      safeLower(cam.camera_id).includes(q) ||
+      safeLower(cam.location).includes(q) ||
+      safeLower(cam.zone_id).includes(q);
 
     const matchesStatus =
       statusFilter === 'ALL' ||
@@ -166,7 +168,22 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                     ID: {cam.camera_id} • {cam.location}
                   </span>
                 </div>
-                <StatusBadge type="status" value={cam.status} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                  <StatusBadge type="status" value={cam.status} />
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                      color: 'var(--color-warning)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      padding: '1px 5px',
+                      borderRadius: 'var(--radius-xs)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cam.status === 'ONLINE' ? 'STREAM PENDING' : 'DISCONNECTED'}
+                  </span>
+                </div>
               </div>
 
               {/* Video Feed Area (Truthful Disconnected Wireframe) */}

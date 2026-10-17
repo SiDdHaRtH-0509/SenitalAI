@@ -2,12 +2,14 @@ import React from 'react';
 import { AlertTriangle, ExternalLink, ShieldCheck, Info } from 'lucide-react';
 import { SecurityEvent } from '../../types';
 import { StatusBadge } from '../ui/StatusBadge';
+import { formatUtcTimestamp, formatConfidencePercent, safeLower } from '../../utils/formatters';
 
 interface RecentEventsTableProps {
   events: SecurityEvent[];
   isLive: boolean;
   onSelectEvent: (event: SecurityEvent) => void;
   searchFilter: string;
+  highlightedEventIds?: Set<string>;
 }
 
 export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
@@ -15,16 +17,18 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   isLive,
   onSelectEvent,
   searchFilter,
+  highlightedEventIds,
 }) => {
   const filteredEvents = events.filter((evt) => {
     if (!searchFilter.trim()) return true;
     const q = searchFilter.toLowerCase();
     return (
-      evt.event_id.toLowerCase().includes(q) ||
-      evt.camera_id.toLowerCase().includes(q) ||
-      evt.event_type.toLowerCase().includes(q) ||
-      (evt.zone_id && evt.zone_id.toLowerCase().includes(q)) ||
-      (evt.risk_level && evt.risk_level.toLowerCase().includes(q))
+      safeLower(evt.event_id).includes(q) ||
+      safeLower(evt.camera_id).includes(q) ||
+      safeLower(evt.event_type).includes(q) ||
+      safeLower(evt.zone_id).includes(q) ||
+      safeLower(evt.risk_level).includes(q) ||
+      safeLower(evt.description).includes(q)
     );
   });
 
@@ -83,7 +87,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               </tr>
             ) : (
               filteredEvents.map((evt) => (
-                <tr key={evt.event_id} onClick={() => onSelectEvent(evt)}>
+                <tr
+                  key={evt.event_id}
+                  className={highlightedEventIds?.has(evt.event_id) ? 'event-row-new' : ''}
+                  onClick={() => onSelectEvent(evt)}
+                >
                   <td className="event-id-cell">
                     <span>{evt.event_id}</span>
                     {evt.is_demo && (
@@ -108,11 +116,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                     </span>
                   </td>
                   <td className="timestamp-cell">
-                    {new Date(evt.timestamp).toISOString().replace('T', ' ').replace('Z', ' UTC')}
+                    {formatUtcTimestamp(evt.timestamp)}
                   </td>
                   <td>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--color-text-highlight)' }}>
-                      {(evt.confidence * 100).toFixed(0)}%
+                      {formatConfidencePercent(evt.confidence)}
                     </span>
                   </td>
                   <td>

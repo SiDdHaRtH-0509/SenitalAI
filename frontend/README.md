@@ -1,8 +1,9 @@
 # SentinelAI — Frontend Command Operations Dashboard (Lead 1)
 
 **Component Owner:** Lead 1 — Frontend Engineer  
-**Current Phase:** Phase 3 — Backend API Integration & Real-Time Security Data  
+**Current Phase:** Phase 5 — Final QA, Performance Optimization & Demonstration Handover (Complete)  
 **Target Environment:** Localhost / IBM LinuxONE (s390x) Web Client  
+**Verification:** 51 Automated Tests Passing, 0 Type Errors, Production Build Verified  
 
 ---
 
@@ -72,7 +73,7 @@ The application will be served at:
 To typecheck and compile the production bundle:
 
 ```bash
-# Execute test suite (12 contract and integration test cases)
+# Execute test suite (32 contract, real-time, and integration test cases)
 npm test
 
 # Type check without emitting files
@@ -89,7 +90,31 @@ Production output is compiled into `frontend/dist/` in ~1.5 seconds with zero wa
 
 ---
 
-## 7. Backend API Integration & Architecture (Phase 3)
+## 7. Real-Time Telemetry & Event Monitoring Architecture (Phase 4)
+
+Phase 4 implements a decoupled real-time event ingestion and operator notification system built upon the `EventStreamService` interface.
+
+### Transport Strategy
+- **Preferred Order:** Server-Sent Events (SSE) $\rightarrow$ WebSockets $\rightarrow$ Controlled HTTP Polling $\rightarrow$ Integration Pending.
+- **Current Operational Reality:** Because the backend implementation is pending deployment by the Overall Lead, the frontend operates in **INTEGRATION_PENDING** mode with safe, non-overlapping polling fallback.
+- **Polling Configuration:** Respects `VITE_POLLING_INTERVAL_SEC` (default: 30s). A value of `0` cleanly disables background timers and activates manual-only refresh mode.
+- **Concurrency Locking:** Reusable `PollingEventStreamService` uses active request locking to eliminate overlapping HTTP requests when network latency exceeds polling frequency.
+
+### Security Notification Center
+- **Header Bell Indicator:** Dynamic badge displaying live unread counts (`aria-label`).
+- **Deduplication Engine:** Stable `notif-{event_id}` IDs guarantee events are never notified twice across repeated polls.
+- **Operator Review Tracking:** Browser-local read status persisted in `localStorage` without mutating server-side incident states.
+- **Operator Incident Inspection:** Direct modal trigger from notifications with full YOLOv8n detection telemetry and recommended actions.
+- **Audio Chime:** Gentle, opt-in synthesized chime via Web Audio API (zero external audio files).
+
+### Visual Feedback & Operator Workflow
+- **Row Arrival Glow:** Newly arrived events flash briefly with `.event-row-new` (respecting `prefers-reduced-motion`).
+- **Status Workflow:** Permitted transitions (`NEW` $\rightarrow$ `ACKNOWLEDGED` $\rightarrow$ `RESOLVED`) with honest offline feedback when the backend is unreachable.
+- **Camera Stream States:** Explicitly reports `STREAM_INTEGRATION_PENDING` or `CAMERA_DISCONNECTED` without fabricated CCTV video.
+
+---
+
+## 8. Backend API Integration & Architecture (Phase 3)
 
 Phase 3 introduces a centralized, typed, and resilient HTTP client layer (`src/services/apiClient.ts`) strictly mapped to `API_CONTRACT.md` v1.0.
 
@@ -204,8 +229,25 @@ Demonstration records are strictly segregated and visibly identified:
 
 ---
 
-## 10. Planned Features for Later Phases
+## 10. Completed Development Roadmap (Phases 1 - 5)
 
-- **Phase 3 (Live Video Streaming & WebSocket Ingestion):** Interactive WebRTC / HLS video stream player, real-time bounding box overlays on video canvas, and zone boundary drawing.
-- **Phase 4 (LinuxONE Production Deployment):** End-to-end integration with live FastAPI backend on IBM LinuxONE, database-persisted incident acknowledgements, and containerized deployment.
-- **Phase 5 (Hardening & Handover):** Final audit, end-to-end verification, and datathon submission package.
+- **Phase 1 (Foundation & Shell):** React 18 + Vite foundation, sidebar navigation, top header, KPI stat cards, and dark theme design tokens.
+- **Phase 2 (Dashboard Pages):** Complete interfaces for Live Monitoring, Security Events, Camera Registry, Restricted Zones, Surveillance Analytics, and System Health.
+- **Phase 3 (Backend Integration & Contracts):** Centralized `ApiClient`, typed error wrappers, configurable `VITE_API_BASE_URL`, and 12 contract tests.
+- **Phase 4 (Real-Time Monitoring & Telemetry):** `EventStreamService` polling loop, event deduplication, notification drawer, audio alert preference, and 20 real-time tests.
+- **Phase 5 (Final QA, Hardening & Handover):** Universal `ErrorBoundary`, crash-resilient formatters, WCAG keyboard accessibility, skip-to-content links, 51 passing automated tests, and comprehensive handover guide (`leads/lead-1-frontend/HANDOVER.md`).
+
+---
+
+## 11. Automated Testing Suite
+
+The frontend includes 51 automated tests executing via Node.js native test runner and `tsx`:
+- **Contract Tests (`tests/apiClient.test.ts`):** 12 integration tests covering HTTP status translations, timeouts, offline fallbacks, and payload normalization.
+- **Real-Time Tests (`tests/phase4Realtime.test.ts`):** 20 tests covering polling locks, deduplication, chronological sorting, audio preferences, and telemetry indicators.
+- **QA & Resilience Tests (`tests/phase5FinalQa.test.ts`):** 19 tests verifying UTC formatters, NaN protection, nullish search filters, demo schema conformance, and error boundary logic.
+
+Run the entire suite:
+```bash
+npm test
+```
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppShell } from './components/layout/AppShell';
 import { OverviewPage } from './pages/OverviewPage';
 import { MonitoringPage } from './pages/MonitoringPage';
@@ -8,6 +8,7 @@ import { ZonesPage } from './pages/ZonesPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SystemHealthPage } from './pages/SystemHealthPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { EventDetailModal } from './components/dashboard/EventDetailModal';
 import {
   NavigationPage,
   SecurityEvent,
@@ -15,13 +16,22 @@ import {
   SystemHealthState,
   CameraInfo,
   ClientSettings,
+  ConnectionState,
+  SecurityNotification,
+  EventStatus,
 } from './types';
 import {
-  fetchRecentEvents,
   fetchDashboardStats,
   fetchSystemHealth,
   fetchCameras,
   loadClientSettings,
+  updateSecurityEventStatus,
+  globalEventStream,
+  getStoredReadNotificationIds,
+  saveReadNotificationIds,
+  createNotificationFromEvent,
+  mergeNotifications,
+  playGentleAudioAlert,
 } from './services/api';
 import {
   DEMO_EVENTS,
@@ -66,12 +76,29 @@ export const App: React.FC = () => {
   const [health, setHealth] = useState<SystemHealthState>(INITIAL_SYSTEM_HEALTH);
   const [cameras, setCameras] = useState<CameraInfo[]>(DEMO_CAMERAS);
   const [isLive, setIsLive] = useState<boolean>(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(
+    globalEventStream.getConnectionState()
+  );
+  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const [settings, setSettings] = useState<ClientSettings>(DEFAULT_CLIENT_SETTINGS);
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    getStoredReadNotificationIds()
+  );
+  const [notifications, setNotifications] = useState<SecurityNotification[]>(() => {
+    const stored = getStoredReadNotificationIds();
+    return DEMO_EVENTS.map((e) => createNotificationFromEvent(e, stored.has(`notif-${e.event_id}`)));
+  });
+  const [highlightedEventIds, setHighlightedEventIds] = useState<Set<string>>(new Set());
+  const [inspectedEvent, setInspectedEvent] = useState<SecurityEvent | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const highlightTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Load client preferences on mount
   useEffect(() => {
     const loaded = loadClientSettings();
     setSettings(loaded);
+    globalEventStream.setPollingIntervalSec(loaded.auto_refresh_interval);
   }, []);
 
   // Listen to browser back/forward buttons
@@ -93,45 +120,136 @@ export const App: React.FC = () => {
     window.location.hash = page === 'overview' ? '' : `#/${page}`;
   };
 
-  const loadData = useCallback(async () => {
-    try {
-      const [eventsRes, statsRes, healthRes, camerasRes] = await Promise.all([
-        fetchRecentEvents(),
-        fetchDashboardStats(),
-        fetchSystemHealth(),
-        fetchCameras(),
-      ]);
+  // Status Change Handler with Graceful Fallback
+  const handleStatusChange = useCallback(
+    async (eventId: string, newStatus: EventStatus) => {
+      const result = await updateSecurityEventStatus(eventId, newStatus);
 
-      setEvents(eventsRes.data);
-      setIsLive(eventsRes.isLive);
-      setStats(statsRes.data);
-      setHealth(healthRes);
-      setCameras(camerasRes.data);
-    } catch {
-      // Graceful fallback to demonstration state
-      setEvents(DEMO_EVENTS);
-      setStats(DEMO_STATISTICS);
-      setHealth(INITIAL_SYSTEM_HEALTH);
-      setCameras(DEMO_CAMERAS);
-      setIsLive(false);
-    }
+      // Apply update locally for review session
+      setEvents((prev) =>
+        prev.map((e) => (e.event_id === eventId ? { ...e, status: newStatus } : e))
+      );
+
+      if (inspectedEvent && inspectedEvent.event_id === eventId) {
+        setInspectedEvent((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
+
+      return result;
+    },
+    [inspectedEvent]
+  );
+
+  // Mark single notification read
+  const handleMarkNotificationAsRead = useCallback((notifId: string) => {
+    setReadNotificationIds((prev) => {
+      const next = new Set(prev);
+      next.add(notifId);
+      saveReadNotificationIds(next);
+      return next;
+    });
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+    );
   }, []);
 
-  // Initial data load
+  // Mark all notifications read
+  const handleMarkAllNotificationsAsRead = useCallback(() => {
+    setNotifications((prev) => {
+      const allIds = new Set<string>();
+      const updated = prev.map((n) => {
+        allIds.add(n.id);
+        return { ...n, read: true };
+      });
+      setReadNotificationIds(allIds);
+      saveReadNotificationIds(allIds);
+      return updated;
+    });
+  }, []);
+
+  // Select event from notification
+  const handleSelectEventById = useCallback(
+    (eventId: string) => {
+      const match = events.find((e) => e.event_id === eventId);
+      if (match) {
+        setInspectedEvent(match);
+      }
+    },
+    [events]
+  );
+
+  // Subscribe to real-time event stream
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    globalEventStream.setPollingIntervalSec(settings.auto_refresh_interval);
+    globalEventStream.connect();
 
-  // Telemetry auto-polling interval
-  useEffect(() => {
-    if (settings.auto_refresh_interval <= 0) return;
+    const unsubscribe = globalEventStream.subscribe((payload) => {
+      setConnectionState(globalEventStream.getConnectionState());
+      setLastRefreshTime(globalEventStream.getLastUpdateTime());
 
-    const intervalId = setInterval(() => {
-      loadData();
-    }, settings.auto_refresh_interval * 1000);
+      if (payload.type === 'NEW_EVENT' && payload.event) {
+        const newEvt = payload.event;
+        // Audio alert if enabled
+        if (settings.enable_audio_alerts) {
+          playGentleAudioAlert();
+        }
 
-    return () => clearInterval(intervalId);
-  }, [settings.auto_refresh_interval, loadData]);
+        // Highlight row briefly
+        setHighlightedEventIds((prev) => {
+          const next = new Set(prev);
+          next.add(newEvt.event_id);
+          return next;
+        });
+
+        // Set 3-second auto un-highlight timer
+        const timer = setTimeout(() => {
+          setHighlightedEventIds((prev) => {
+            const next = new Set(prev);
+            next.delete(newEvt.event_id);
+            return next;
+          });
+          highlightTimeoutsRef.current.delete(newEvt.event_id);
+        }, 3000);
+        highlightTimeoutsRef.current.set(newEvt.event_id, timer);
+
+        // Add to notifications
+        const notif = createNotificationFromEvent(newEvt, false);
+        setNotifications((prev) => mergeNotifications(prev, [notif], readNotificationIds));
+      }
+
+      if (payload.type === 'EVENT_BATCH' && payload.events) {
+        setEvents(payload.events);
+        setIsLive(payload.events.length > 0 && !payload.events[0].is_demo);
+        if (payload.stats) {
+          setStats(payload.stats);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      globalEventStream.disconnect();
+      // Clean up all pending row highlight timers
+      highlightTimeoutsRef.current.forEach((t) => clearTimeout(t));
+      highlightTimeoutsRef.current.clear();
+    };
+  }, [settings.auto_refresh_interval, settings.enable_audio_alerts, readNotificationIds]);
+
+  // Full Refresh Trigger
+  const loadData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        globalEventStream.refreshNow(),
+        fetchDashboardStats().then((res) => setStats(res.data)),
+        fetchSystemHealth().then((res) => setHealth(res)),
+        fetchCameras().then((res) => setCameras(res.data)),
+      ]);
+      setConnectionState(globalEventStream.getConnectionState());
+      setLastRefreshTime(globalEventStream.getLastUpdateTime());
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
 
   const renderActivePage = () => {
     switch (activePage) {
@@ -145,6 +263,8 @@ export const App: React.FC = () => {
             isLive={isLive}
             onRefresh={loadData}
             searchFilter={searchQuery}
+            highlightedEventIds={highlightedEventIds}
+            onStatusChange={handleStatusChange}
           />
         );
       case 'monitoring':
@@ -162,6 +282,8 @@ export const App: React.FC = () => {
             isLive={isLive}
             onRefresh={loadData}
             initialSearchFilter={searchQuery}
+            highlightedEventIds={highlightedEventIds}
+            onStatusChange={handleStatusChange}
           />
         );
       case 'cameras':
@@ -192,7 +314,10 @@ export const App: React.FC = () => {
         return (
           <SettingsPage
             settings={settings}
-            onUpdateSettings={(newSettings) => setSettings(newSettings)}
+            onUpdateSettings={(newSettings) => {
+              setSettings(newSettings);
+              globalEventStream.setPollingIntervalSec(newSettings.auto_refresh_interval);
+            }}
           />
         );
       default:
@@ -205,6 +330,8 @@ export const App: React.FC = () => {
             isLive={isLive}
             onRefresh={loadData}
             searchFilter={searchQuery}
+            highlightedEventIds={highlightedEventIds}
+            onStatusChange={handleStatusChange}
           />
         );
     }
@@ -216,8 +343,24 @@ export const App: React.FC = () => {
       onNavigate={handleNavigate}
       searchQuery={searchQuery}
       onSearchChange={(q) => setSearchQuery(q)}
+      connectionState={connectionState}
+      isLive={isLive}
+      lastRefreshTime={lastRefreshTime}
+      notifications={notifications}
+      onMarkNotificationAsRead={handleMarkNotificationAsRead}
+      onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
+      onSelectEventById={handleSelectEventById}
+      onManualRefresh={loadData}
+      isRefreshing={isRefreshing}
     >
       {renderActivePage()}
+
+      {/* Global Event Detail Modal (when triggered via notifications or direct inspect) */}
+      <EventDetailModal
+        event={inspectedEvent}
+        onClose={() => setInspectedEvent(null)}
+        onStatusChange={handleStatusChange}
+      />
     </AppShell>
   );
 };

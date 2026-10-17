@@ -5,6 +5,8 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { CameraDetailModal } from '../components/dashboard/CameraDetailModal';
 import { EmptyState } from '../components/ui/EmptyState';
 
+import { safeLower } from '../utils/formatters';
+
 interface CamerasPageProps {
   cameras: CameraInfo[];
   onRefresh: () => Promise<void>;
@@ -34,10 +36,10 @@ export const CamerasPage: React.FC<CamerasPageProps> = ({
     if (!localSearch.trim()) return true;
     const q = localSearch.toLowerCase();
     return (
-      cam.name.toLowerCase().includes(q) ||
-      cam.camera_id.toLowerCase().includes(q) ||
-      cam.location.toLowerCase().includes(q) ||
-      cam.zone_id.toLowerCase().includes(q)
+      safeLower(cam.name).includes(q) ||
+      safeLower(cam.camera_id).includes(q) ||
+      safeLower(cam.location).includes(q) ||
+      safeLower(cam.zone_id).includes(q)
     );
   });
 

@@ -1,30 +1,60 @@
-import React from 'react';
-import { X, AlertOctagon, CheckCircle2, Shield, Info } from 'lucide-react';
-import { SecurityEvent } from '../../types';
+import React, { useState } from 'react';
+import { X, AlertOctagon, CheckCircle2, Shield, Info, RefreshCw, AlertTriangle } from 'lucide-react';
+import { SecurityEvent, EventStatus } from '../../types';
 import { StatusBadge } from '../ui/StatusBadge';
 
 interface EventDetailModalProps {
   event: SecurityEvent | null;
   onClose: () => void;
-  onAcknowledge?: (eventId: string) => void;
+  onStatusChange?: (eventId: string, newStatus: EventStatus) => Promise<{ success: boolean; message: string; isLive: boolean }>;
 }
 
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   event,
   onClose,
-  onAcknowledge,
+  onStatusChange,
 }) => {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ text: string; isError: boolean } | null>(null);
+
   if (!event) return null;
 
+  const handleUpdateStatus = async (newStatus: EventStatus) => {
+    if (!onStatusChange) return;
+    setIsUpdating(true);
+    setFeedbackMessage(null);
+    try {
+      const result = await onStatusChange(event.event_id, newStatus);
+      if (!result.isLive) {
+        setFeedbackMessage({
+          text: `Status set to ${newStatus} in local session. Server persistence is pending deployment of the FastAPI backend service.`,
+          isError: false,
+        });
+      } else {
+        setFeedbackMessage({
+          text: `Status successfully updated to ${newStatus} on backend server.`,
+          isError: false,
+        });
+      }
+    } catch (err: unknown) {
+      setFeedbackMessage({
+        text: err instanceof Error ? err.message : 'Failed to update event status.',
+        isError: true,
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-incident-title">
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertOctagon size={18} style={{ color: 'var(--color-critical)' }} />
             <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              <h3 id="modal-incident-title" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
                 Incident Details: {event.event_id}
               </h3>
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
@@ -36,7 +66,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             type="button"
             className="icon-btn"
             onClick={onClose}
-            aria-label="Close modal"
+            aria-label="Close incident details"
           >
             <X size={16} />
           </button>
@@ -62,6 +92,29 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               <span>
                 <strong>Demonstration Record:</strong> This is a synthetic event fixture for UI evaluation.
               </span>
+            </div>
+          )}
+
+          {/* Operator Action Feedback Banner */}
+          {feedbackMessage && (
+            <div
+              style={{
+                backgroundColor: feedbackMessage.isError
+                  ? 'var(--color-critical-bg)'
+                  : 'rgba(14, 165, 233, 0.1)',
+                border: `1px solid ${feedbackMessage.isError ? 'var(--color-critical-border)' : 'rgba(14, 165, 233, 0.3)'}`,
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 12px',
+                fontSize: '11px',
+                color: feedbackMessage.isError ? 'var(--color-critical)' : 'var(--color-accent-blue)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+              role="alert"
+            >
+              {feedbackMessage.isError ? <AlertTriangle size={14} /> : <Info size={14} />}
+              <span>{feedbackMessage.text}</span>
             </div>
           )}
 
@@ -117,6 +170,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               <span className="detail-value">{event.event_type}</span>
             </div>
             <div className="detail-row">
+              <span className="detail-label">Person Count:</span>
+              <span className="detail-value">{event.person_count ?? event.evidence.person_count ?? 1}</span>
+            </div>
+            <div className="detail-row">
               <span className="detail-label">Detection Confidence:</span>
               <span className="detail-value">{(event.confidence * 100).toFixed(1)}% (YOLOv8n Class 0)</span>
             </div>
@@ -136,7 +193,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Heuristic Reasons */}
+          {/* Backend Heuristic Reasons */}
           {event.reasons && event.reasons.length > 0 && (
             <div className="reasons-box">
               <h5>Backend Risk Determinants</h5>
@@ -164,35 +221,56 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   Recommended Action
                 </span>
               </div>
-              <p style={{ fontSize: '12px', color: 'var(--color-text-primary)' }}>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-primary)', margin: 0 }}>
                 {event.recommended_action}
               </p>
             </div>
           )}
         </div>
 
-        {/* Modal Footer */}
+        {/* Modal Footer with Operator Actions */}
         <div className="modal-footer">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Dismiss
-            </button>
-            {event.status === 'NEW' && onAcknowledge && (
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{
-                  backgroundColor: 'var(--color-accent-blue)',
-                  color: '#fff',
-                  borderColor: 'var(--color-accent-blue)',
-                }}
-                onClick={() => onAcknowledge(event.event_id)}
-              >
-                <CheckCircle2 size={13} />
-                Acknowledge Incident
-              </button>
-            )}
-          </div>
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={isUpdating}>
+            Dismiss
+          </button>
+
+          {onStatusChange && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {event.status === 'NEW' && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    backgroundColor: 'var(--color-accent-blue)',
+                    color: '#fff',
+                    borderColor: 'var(--color-accent-blue)',
+                  }}
+                  disabled={isUpdating}
+                  onClick={() => handleUpdateStatus('ACKNOWLEDGED')}
+                >
+                  {isUpdating ? <RefreshCw size={12} className="spin-icon" /> : <CheckCircle2 size={12} />}
+                  Acknowledge Incident
+                </button>
+              )}
+
+              {event.status !== 'RESOLVED' && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{
+                    backgroundColor: 'var(--color-success)',
+                    color: '#fff',
+                    borderColor: 'var(--color-success)',
+                  }}
+                  disabled={isUpdating}
+                  onClick={() => handleUpdateStatus('RESOLVED')}
+                >
+                  {isUpdating ? <RefreshCw size={12} className="spin-icon" /> : <CheckCircle2 size={12} />}
+                  Mark Resolved
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

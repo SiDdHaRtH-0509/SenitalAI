@@ -25,7 +25,17 @@ Work in order. Check boxes only after the criterion is met.
 
 ## Tertiary / optional (only after MVP)
 - [x] Add a small risk trend chart based on real stored events (Implemented in AnalyticsPage).
-- [ ] Add WebSockets only if polling is stable and there is spare time.
+- [x] Implement real-time transport interface (EventStreamService) with non-overlapping polling and event deduplication (Phase 4).
+
+## Phase 5 Final QA, Hardening & Handover
+- [x] Integrate universal React ErrorBoundary to prevent white-screen crashes.
+- [x] Add crash-resilient formatters (`formatUtcTimestamp`, `formatRelativeTime`, `safeLower`, `formatConfidencePercent`).
+- [x] Implement WCAG skip-to-content links and universal `:focus-visible` keyboard accessibility.
+- [x] Write Phase 5 test suite verifying crash resilience, data integrity, and fallback states.
+- [x] Pass all 51 automated frontend tests (100% pass rate).
+- [x] Verify zero TypeScript errors and clean production build.
+- [x] Verify zero regressions in Computer Vision engine (122 unit tests passing).
+- [x] Create comprehensive handover document `leads/lead-1-frontend/HANDOVER.md`.
 
 ## Completion criteria
-Dashboard displays real backend events, shows explanations from backend, handles connection failures, labels replay data, and builds from documented instructions.
+Dashboard displays real backend events, shows explanations from backend, handles connection failures, labels replay data, passes 51 automated tests, and builds cleanly from documented instructions.

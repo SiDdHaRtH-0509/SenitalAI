@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopHeader } from './TopHeader';
-import { NavigationPage } from '../../types';
+import { NavigationPage, ConnectionState, SecurityNotification } from '../../types';
 import { DEMO_DATA_NOTICE } from '../../data/demoData';
 import { Info } from 'lucide-react';
 
@@ -11,6 +11,15 @@ interface AppShellProps {
   children: React.ReactNode;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  connectionState: ConnectionState;
+  isLive: boolean;
+  lastRefreshTime: string | null;
+  notifications: SecurityNotification[];
+  onMarkNotificationAsRead: (id: string) => void;
+  onMarkAllNotificationsAsRead: () => void;
+  onSelectEventById: (eventId: string) => void;
+  onManualRefresh: () => Promise<void>;
+  isRefreshing: boolean;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -19,11 +28,24 @@ export const AppShell: React.FC<AppShellProps> = ({
   children,
   searchQuery,
   onSearchChange,
+  connectionState,
+  isLive,
+  lastRefreshTime,
+  notifications,
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onSelectEventById,
+  onManualRefresh,
+  isRefreshing,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="app-container">
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
       {/* Sidebar Navigation */}
       <Sidebar
         activePage={activePage}
@@ -37,14 +59,23 @@ export const AppShell: React.FC<AppShellProps> = ({
         {/* Global Demo Notice Banner */}
         <div className="demo-banner" role="status">
           <div className="demo-banner-content">
-            <span className="demo-banner-badge">Notice</span>
+            <span className="demo-banner-badge">Phase 4 Notice</span>
             <Info size={14} />
             <span>
-              <strong>Phase 1 UI Demonstration:</strong> {DEMO_DATA_NOTICE}. Real-time backend & CV streaming integration will connect in subsequent phases.
+              <strong>SentinelAI Telemetry:</strong>{' '}
+              {isLive ? (
+                <span style={{ color: 'var(--color-success)' }}>
+                  Connected to live backend stream. Real-time events active.
+                </span>
+              ) : (
+                <>
+                  {DEMO_DATA_NOTICE}. Real-time monitoring engine active in offline demonstration fallback mode.
+                </>
+              )}
             </span>
           </div>
           <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-            Status: Frontend Operational (Local)
+            Status: {isLive ? 'Backend Live' : 'Offline / Demonstration Mode'}
           </span>
         </div>
 
@@ -54,6 +85,15 @@ export const AppShell: React.FC<AppShellProps> = ({
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
+          connectionState={connectionState}
+          isLive={isLive}
+          lastRefreshTime={lastRefreshTime}
+          notifications={notifications}
+          onMarkNotificationAsRead={onMarkNotificationAsRead}
+          onMarkAllNotificationsAsRead={onMarkAllNotificationsAsRead}
+          onSelectEventById={onSelectEventById}
+          onManualRefresh={onManualRefresh}
+          isRefreshing={isRefreshing}
         />
 
         {/* Page Content Body */}
