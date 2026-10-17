@@ -1,7 +1,7 @@
 # SentinelAI — Frontend Command Operations Dashboard (Lead 1)
 
 **Component Owner:** Lead 1 — Frontend Engineer  
-**Current Phase:** Phase 2 — Complete Dashboard Pages & Monitoring Interfaces  
+**Current Phase:** Phase 3 — Backend API Integration & Real-Time Security Data  
 **Target Environment:** Localhost / IBM LinuxONE (s390x) Web Client  
 
 ---
@@ -72,6 +72,9 @@ The application will be served at:
 To typecheck and compile the production bundle:
 
 ```bash
+# Execute test suite (12 contract and integration test cases)
+npm test
+
 # Type check without emitting files
 npm run typecheck
 
@@ -82,11 +85,52 @@ npm run build
 npm run preview
 ```
 
-Production output is compiled into `frontend/dist/` in ~2.0 seconds with zero warnings or errors.
+Production output is compiled into `frontend/dist/` in ~1.5 seconds with zero warnings or errors.
 
 ---
 
-## 7. Implemented Pages & Features (Phase 2)
+## 7. Backend API Integration & Architecture (Phase 3)
+
+Phase 3 introduces a centralized, typed, and resilient HTTP client layer (`src/services/apiClient.ts`) strictly mapped to `API_CONTRACT.md` v1.0.
+
+### Environment Configuration (`.env.example`)
+Create a `.env` file in `frontend/` (or rely on defaults):
+```bash
+# FastAPI backend base endpoint
+VITE_API_BASE_URL=http://localhost:8000
+
+# Client request timeout in milliseconds
+VITE_API_TIMEOUT_MS=5000
+
+# Background telemetry polling interval in seconds
+VITE_POLLING_INTERVAL_SEC=30
+```
+
+### API Client Capabilities
+- **Strictly Typed Contracts:** Comprehensive TypeScript interfaces for request bodies and response payloads.
+- **Timeout & Cancellation:** Native `AbortController` timeout handling with automatic signal merging.
+- **Standardized Error Translation:** Normalizes HTTP non-2xx status codes, fetch refusals (`isNetworkError`), and timeouts (`isTimeout`) into `ApiClientError`.
+- **Zero-Crash Offline Fallback:** When the backend server is unreachable or offline, the client cleanly falls back to calibrated demonstration fixtures with an explicit `isLive: false` flag and human-readable banner notices.
+- **Security & Hygiene:** Zero hardcoded credentials or private tokens.
+
+### Contract Test Coverage
+Run `npm test` to execute the full test suite (`tests/apiClient.test.ts`), covering:
+1. `GET /api/health`, `GET /api/stats`, and `GET /api/events` successful response parsing.
+2. HTTP 404 and 500 error propagation with structured details.
+3. Network connection refusal (`ECONNREFUSED`) handling and offline fallback.
+4. Slow request timeouts (50ms abort with status 408).
+5. Non-JSON / HTML error response handling without syntax errors.
+6. Empty event lists (`[]`) handled safely without crashing.
+7. Missing optional fields (`risk_score`, `reasons`, `recommended_action`, `person_count`).
+8. Client-side risk level, camera, status filtering and timestamp sorting.
+9. Loading and offline fallback states with demo fixtures.
+10. Error translation and human-readable messaging.
+11. `PATCH /api/events/{id}/status` status persistence.
+12. Configurable base URL normalization and query parameter serialization.
+
+---
+
+## 8. Implemented Pages & Features
 
 ### A. Overview Dashboard (`/`)
 - Consolidated KPI cards (Active Cameras 0/4, Events Today, Restricted-Zone Alerts, Critical Priority).

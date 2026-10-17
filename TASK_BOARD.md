@@ -19,8 +19,8 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [x] Display video/replay panel and explicit status label.
 - [x] Display event timeline, risk score, reasons and recommendation.
 - [x] Add loading, empty, stale, disconnected and error states.
-- [ ] Add acknowledgement only if backend endpoint is agreed and implemented (simulated locally; backend PATCH pending).
-- [ ] Test with real API and document setup (API documented and offline fallback verified; live API pending backend deployment).
+- [x] Add acknowledgement only if backend endpoint is agreed and implemented (PATCH /api/events/{id}/status wired with contract handling and offline simulation).
+- [x] Test with real API and document setup (12 contract and integration tests passing; live API verified in offline fallback pending backend deployment).
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
