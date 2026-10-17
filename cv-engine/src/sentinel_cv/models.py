@@ -267,6 +267,134 @@ class ZoneAnalysisResult:
         }
 
 
+VALID_EVENT_TYPES: Set[str] = {"RESTRICTED_ZONE_ENTRY"}
+VALID_SEVERITIES: Set[str] = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
+
+@dataclass(frozen=True)
+class SecurityEvent:
+    """Structured security observation event conforming to API_CONTRACT.md.
+
+    This model represents observable Computer Vision detections and zone entries.
+    It deliberately does NOT calculate risk scores or threat probabilities, which
+    are strictly owned and evaluated by the backend service.
+
+    Attributes:
+        event_id: Unique, deterministic event identifier string (e.g., 'evt-demo-0001').
+        camera_id: Identifier of the source video or camera (e.g., 'cam-demo-01').
+        event_type: Contract-defined event type ('RESTRICTED_ZONE_ENTRY').
+        timestamp: ISO-8601 formatted string with timezone (e.g., '2026-10-17T09:30:00Z').
+        severity: Observable severity rating ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL').
+        confidence: Detector statistical confidence score in [0.0, 1.0].
+        zone_id: Identifier of the restricted zone associated with the observation.
+        description: Factual, concise description of the observable condition.
+        evidence: Structured dictionary containing observable metadata.
+    """
+
+    event_id: str
+    camera_id: str
+    timestamp: str
+    confidence: float
+    zone_id: str
+    description: str
+    event_type: str = "RESTRICTED_ZONE_ENTRY"
+    severity: str = "HIGH"
+    evidence: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate all event fields against API_CONTRACT.md rules."""
+        if not self.event_id or not str(self.event_id).strip():
+            raise ValueError("SecurityEvent event_id must be a non-empty string.")
+
+        if not self.camera_id or not str(self.camera_id).strip():
+            raise ValueError("SecurityEvent camera_id must be a non-empty string.")
+
+        if self.event_type not in VALID_EVENT_TYPES:
+            raise ValueError(
+                f"Invalid event_type '{self.event_type}'. Must be one of: {sorted(VALID_EVENT_TYPES)}"
+            )
+
+        if not self.timestamp or not str(self.timestamp).strip():
+            raise ValueError("SecurityEvent timestamp must be a non-empty ISO-8601 string.")
+
+        # Basic ISO-8601 timezone verification (must contain 'T' and 'Z' or timezone offset)
+        ts = str(self.timestamp).strip()
+        if "T" not in ts or not (ts.endswith("Z") or "+" in ts or "-" in ts[10:]):
+            raise ValueError(
+                f"SecurityEvent timestamp must be an ISO-8601 string with timezone, got: '{self.timestamp}'"
+            )
+
+        if self.severity not in VALID_SEVERITIES:
+            raise ValueError(
+                f"Invalid severity '{self.severity}'. Must be one of: {sorted(VALID_SEVERITIES)}"
+            )
+
+        if (
+            not isinstance(self.confidence, (int, float))
+            or isinstance(self.confidence, bool)
+            or not math.isfinite(self.confidence)
+            or not (0.0 <= float(self.confidence) <= 1.0)
+        ):
+            raise ValueError(
+                f"SecurityEvent confidence must be a finite float in [0.0, 1.0], got: {self.confidence}"
+            )
+
+        if not self.zone_id or not str(self.zone_id).strip():
+            raise ValueError("SecurityEvent zone_id must be a non-empty string.")
+
+        if not self.description or not str(self.description).strip():
+            raise ValueError("SecurityEvent description must be a non-empty string.")
+
+        if not isinstance(self.evidence, dict):
+            raise ValueError(f"SecurityEvent evidence must be a dictionary, got: {type(self.evidence).__name__}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize event to dictionary strictly matching API_CONTRACT.md payload schema."""
+        return {
+            "event_id": self.event_id,
+            "camera_id": self.camera_id,
+            "event_type": self.event_type,
+            "timestamp": self.timestamp,
+            "severity": self.severity,
+            "confidence": round(float(self.confidence), 4),
+            "zone_id": self.zone_id,
+            "description": self.description,
+            "evidence": dict(self.evidence),
+        }
+
+
+@dataclass(frozen=True)
+class EventSubmissionResult:
+    """Result of attempting to submit an event to the backend API.
+
+    Attributes:
+        event_id: The ID of the event submitted.
+        success: True if accepted by backend or handled via idempotent return.
+        status_code: HTTP response code received (or 0 for network/connection failure).
+        response_data: Optional parsed JSON response dictionary from backend.
+        error_message: Optional description of error if submission failed.
+        idempotent_duplicate: True if backend indicated event was an idempotent duplicate.
+    """
+
+    event_id: str
+    success: bool
+    status_code: int = 0
+    response_data: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    idempotent_duplicate: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize submission result to dictionary."""
+        return {
+            "event_id": self.event_id,
+            "success": self.success,
+            "status_code": self.status_code,
+            "response_data": self.response_data,
+            "error_message": self.error_message,
+            "idempotent_duplicate": self.idempotent_duplicate,
+        }
+
+
 @dataclass(frozen=True)
 class PipelineResult:
     """Predictable container for pipeline frame processing results.
@@ -275,6 +403,8 @@ class PipelineResult:
         metadata: FrameMetadata associated with the frame.
         detections: Tuple of Detection instances found in the frame.
         zone_results: Tuple of ZoneAnalysisResult instances for the frame.
+        events: Tuple of SecurityEvent instances generated from zone results.
+        event_submissions: Tuple of EventSubmissionResult from backend client.
         processed: Whether the frame was actively analyzed.
         status_message: Informative status or diagnostic message.
     """
@@ -282,6 +412,8 @@ class PipelineResult:
     metadata: FrameMetadata
     detections: Tuple[Detection, ...] = field(default_factory=tuple)
     zone_results: Tuple[ZoneAnalysisResult, ...] = field(default_factory=tuple)
+    events: Tuple[SecurityEvent, ...] = field(default_factory=tuple)
+    event_submissions: Tuple[EventSubmissionResult, ...] = field(default_factory=tuple)
     processed: bool = False
     status_message: str = "Initialized"
 
@@ -296,7 +428,11 @@ class PipelineResult:
             "metadata": self.metadata.to_dict(),
             "detections": [d.to_dict() for d in self.detections],
             "zone_results": [z.to_dict() for z in self.zone_results],
+            "events": [e.to_dict() for e in self.events],
+            "event_submissions": [s.to_dict() for s in self.event_submissions],
             "inside_zone_count": len(self.inside_zone_results),
+            "event_count": len(self.events),
             "processed": self.processed,
             "status_message": self.status_message,
         }
+

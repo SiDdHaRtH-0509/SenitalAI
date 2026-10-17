@@ -14,6 +14,7 @@ from typing import Any, List, Optional, Set, Tuple
 VALID_INPUT_SOURCE_TYPES: Set[str] = {"file", "camera", "stream", "replay"}
 VALID_LOG_LEVELS: Set[str] = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 VALID_REF_STRATEGIES: Set[str] = {"bottom_center", "center"}
+VALID_SEVERITIES: Set[str] = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 
 
 class ConfigurationError(ValueError):
@@ -50,13 +51,18 @@ class CVConfig:
     zones_json: Optional[str] = None
     reference_point_strategy: str = "bottom_center"
 
-    # Deduplication & Debounce placeholders (Phase 3/4)
+    # Deduplication & Debounce (Phase 3/4)
     deduplication_cooldown_sec: float = 5.0
     temporal_confirmation_frames: int = 3
     replay_mode: bool = False
 
-    # Backend integration target
+    # Event generation & Backend integration target (Phase 4)
+    events_enabled: bool = True
+    event_severity: str = "HIGH"
+    base_timestamp: Optional[str] = "2026-10-17T09:30:00Z"
     backend_url: str = "http://localhost:8000"
+    api_timeout: float = 5.0
+    api_max_retries: int = 2
 
     def __post_init__(self) -> None:
         """Validate all configuration attributes strictly."""
@@ -155,6 +161,47 @@ class CVConfig:
         if not self.backend_url or not str(self.backend_url).strip():
             raise ConfigurationError("backend_url must be a non-empty string URL.")
 
+        # 12. Validate events_enabled
+        if not isinstance(self.events_enabled, bool):
+            raise ConfigurationError("events_enabled must be a boolean.")
+
+        # 13. Validate event severity
+        normalized_sev = self.event_severity.strip().upper()
+        if normalized_sev not in VALID_SEVERITIES:
+            raise ConfigurationError(
+                f"Invalid event_severity '{self.event_severity}'. Must be one of: {sorted(VALID_SEVERITIES)}"
+            )
+        object.__setattr__(self, "event_severity", normalized_sev)
+
+        # 14. Validate api_timeout
+        if (
+            not isinstance(self.api_timeout, (int, float))
+            or isinstance(self.api_timeout, bool)
+            or not math.isfinite(self.api_timeout)
+            or float(self.api_timeout) <= 0.0
+        ):
+            raise ConfigurationError(
+                f"api_timeout must be a positive finite number, got: {self.api_timeout}"
+            )
+
+        # 15. Validate api_max_retries
+        if (
+            not isinstance(self.api_max_retries, int)
+            or isinstance(self.api_max_retries, bool)
+            or self.api_max_retries < 0
+        ):
+            raise ConfigurationError(
+                f"api_max_retries must be an integer >= 0, got: {self.api_max_retries}"
+            )
+
+        # 16. Validate base_timestamp
+        if self.base_timestamp is not None:
+            ts = str(self.base_timestamp).strip()
+            if "T" not in ts or not (ts.endswith("Z") or "+" in ts or "-" in ts[10:]):
+                raise ConfigurationError(
+                    f"base_timestamp must be a valid ISO-8601 string with timezone, got: '{self.base_timestamp}'"
+                )
+
     def get_configured_zones(self) -> List[Any]:
         """Resolve and instantiate PolygonZone instances from configuration.
 
@@ -226,6 +273,15 @@ class CVConfig:
         raw_replay = os.getenv("CV_REPLAY_MODE", "false").strip().lower()
         parsed_replay = raw_replay in {"1", "true", "yes", "on"}
 
+        raw_events = os.getenv("CV_EVENTS_ENABLED", "true").strip().lower()
+        parsed_events = raw_events in {"1", "true", "yes", "on"}
+
+        raw_timeout = os.getenv("CV_API_TIMEOUT")
+        parsed_timeout = float(raw_timeout) if raw_timeout and raw_timeout.strip() else 5.0
+
+        raw_retries = os.getenv("CV_API_MAX_RETRIES")
+        parsed_retries = int(raw_retries) if raw_retries and raw_retries.strip() else 2
+
         return cls(
             input_source_type=os.getenv("CV_INPUT_SOURCE_TYPE", "file"),
             video_source=os.getenv("CV_VIDEO_SOURCE", "sample-data/demo.mp4"),
@@ -244,5 +300,10 @@ class CVConfig:
             deduplication_cooldown_sec=parsed_cooldown,
             temporal_confirmation_frames=parsed_temporal,
             replay_mode=parsed_replay,
+            events_enabled=parsed_events,
+            event_severity=os.getenv("CV_EVENT_SEVERITY", "HIGH"),
+            base_timestamp=os.getenv("CV_BASE_TIMESTAMP", "2026-10-17T09:30:00Z"),
             backend_url=os.getenv("CV_BACKEND_URL", "http://localhost:8000"),
+            api_timeout=parsed_timeout,
+            api_max_retries=parsed_retries,
         )

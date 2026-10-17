@@ -27,11 +27,15 @@ class TestCVConfig(unittest.TestCase):
         self.assertEqual(config.model_type, "placeholder")
         self.assertIsNone(config.model_path)
         self.assertAlmostEqual(config.confidence_threshold, 0.50)
-        self.assertEqual(config.zone_id, "zone-restricted-01")
         self.assertAlmostEqual(config.deduplication_cooldown_sec, 5.0)
         self.assertEqual(config.temporal_confirmation_frames, 3)
         self.assertFalse(config.replay_mode)
         self.assertEqual(config.backend_url, "http://localhost:8000")
+        self.assertTrue(config.events_enabled)
+        self.assertEqual(config.event_severity, "HIGH")
+        self.assertEqual(config.api_timeout, 5.0)
+        self.assertEqual(config.api_max_retries, 2)
+        self.assertEqual(config.base_timestamp, "2026-10-17T09:30:00Z")
 
     def test_custom_valid_configuration(self) -> None:
         """Verify custom valid configuration parameters."""
@@ -199,6 +203,26 @@ class TestCVConfig(unittest.TestCase):
         """Verify empty backend URL raises ConfigurationError."""
         with self.assertRaises(ConfigurationError):
             CVConfig(backend_url="")
+
+    def test_invalid_event_severity(self) -> None:
+        """Verify unapproved severity raises ConfigurationError."""
+        with self.assertRaises(ConfigurationError):
+            CVConfig(event_severity="DANGEROUS")
+
+    def test_invalid_api_timeout_and_retries(self) -> None:
+        """Verify non-positive timeout or negative retries raise ConfigurationError."""
+        with self.assertRaises(ConfigurationError):
+            CVConfig(api_timeout=0.0)
+        with self.assertRaises(ConfigurationError):
+            CVConfig(api_timeout=-5.0)
+        with self.assertRaises(ConfigurationError):
+            CVConfig(api_max_retries=-1)
+
+    def test_invalid_base_timestamp(self) -> None:
+        """Verify invalid ISO base_timestamp raises ConfigurationError."""
+        with self.assertRaises(ConfigurationError):
+            CVConfig(base_timestamp="2026-10-17 09:30:00")
+
 
 
 class TestLoggingConfig(unittest.TestCase):

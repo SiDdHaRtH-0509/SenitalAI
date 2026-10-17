@@ -9,15 +9,15 @@
 - [x] Integrate a compatible pretrained person detector. **Done when:** a sample frame produces a detection or documented fallback is activated. *(Phase 2 completed: YOLOPersonDetector using YOLOv8n CPU, COCO person class filtering, BoundingBox validation, and MockPersonDetector fallback)*
 - [x] Implement one configurable zone. **Done when:** zone is visible/configurable and geometry is documented. *(Phase 3 completed: PolygonZone with Shoelace area, bbox caching, and JSON/tuple vertex configuration)*
 - [x] Implement zone-entry logic. **Done when:** representative point and entry rule are deterministic. *(Phase 3 completed: pure Python Ray-Casting algorithm with boundary tolerance, bottom-center ground contact anchor, ZoneAnalyzer adapter)*
-- [ ] Add temporal confirmation. **Done when:** a single noisy frame does not immediately create an event. *(Phase 4)*
-- [ ] Add event cooldown/deduplication. **Done when:** continuous presence does not flood backend. *(Phase 4)*
-- [ ] Build event payload exactly as API contract. **Done when:** schema validation succeeds. *(Phase 4)*
-- [ ] POST event to backend. **Done when:** event appears in backend storage/dashboard. *(Phase 4)*
-- [ ] Add model/video/API error handling. **Done when:** failures are visible and recoverable. *(Phase 4)*
+- [x] Add temporal confirmation. **Done when:** a single noisy frame does not immediately create an event. *(Phase 4 completed: temporal_confirmation_frames debounce counter)*
+- [x] Add event cooldown/deduplication. **Done when:** continuous presence does not flood backend. *(Phase 4 completed: deduplication_cooldown_sec window per zone)*
+- [x] Build event payload exactly as API contract. **Done when:** schema validation succeeds. *(Phase 4 completed: SecurityEvent strictly adhering to API_CONTRACT.md schema)*
+- [ ] POST event to backend. **Done when:** event appears in backend storage/dashboard. *(Phase 4: BackendClient implemented and verified via mock transports; live backend pending deployment by Overall Lead)*
+- [x] Add model/video/API error handling. **Done when:** failures are visible and recoverable. *(Phase 4 completed: bounded retries, explicit timeouts, 4xx non-retry, graceful degradation)*
 - [ ] Commit and open PR. **Done when:** lead can review isolated CV changes. *(Phase 5)*
 
 ## Secondary tasks
-- [x] Add CLI options for video path, zone config, camera ID and backend URL. *(Phase 2/3 completed: CLI supports --video, --model, --confidence, --max-frames, --camera-id, --zone-id, --zone-vertices, --zones-file, --strategy, --json)*
+- [x] Add CLI options for video path, zone config, camera ID and backend URL. *(Phase 2/3/4 completed: CLI supports --video, --model, --confidence, --max-frames, --camera-id, --zone-id, --zone-vertices, --zones-file, --strategy, --backend-url, --severity, --debounce, --cooldown, --disable-events, --json)*
 - [ ] Save a short test log showing generated event fields.
 - [ ] Add a clearly labelled deterministic replay fallback.
 

@@ -87,6 +87,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Reference point strategy for zone analysis (default: bottom_center)",
     )
     parser.add_argument(
+        "--backend-url",
+        type=str,
+        default="http://localhost:8000",
+        help="Base URL of SentinelAI backend service (default: http://localhost:8000)",
+    )
+    parser.add_argument(
+        "--disable-events",
+        action="store_true",
+        help="Disable structured security event generation and backend submission",
+    )
+    parser.add_argument(
+        "--severity",
+        type=str,
+        default="HIGH",
+        choices=["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+        help="Observable severity rating for generated events (default: HIGH)",
+    )
+    parser.add_argument(
+        "--debounce",
+        type=int,
+        default=1,
+        help="Temporal confirmation frames required before emitting event (default: 1)",
+    )
+    parser.add_argument(
+        "--cooldown",
+        type=float,
+        default=5.0,
+        help="Cooldown deduplication window in seconds per zone (default: 5.0)",
+    )
+    parser.add_argument(
         "--fps",
         type=float,
         default=25.0,
@@ -160,6 +190,11 @@ def run_cli(args: Optional[List[str]] = None) -> int:
             model_type=model_type,
             model_path=parsed.model,
             confidence_threshold=parsed.confidence,
+            backend_url=parsed.backend_url,
+            events_enabled=not parsed.disable_events,
+            event_severity=parsed.severity,
+            temporal_confirmation_frames=parsed.debounce,
+            deduplication_cooldown_sec=parsed.cooldown,
         )
     except ConfigurationError as cfg_err:
         logger.error("Configuration error: %s", cfg_err)
@@ -167,22 +202,7 @@ def run_cli(args: Optional[List[str]] = None) -> int:
 
     # Wire pipeline components
     try:
-        source = OpenCVVideoSource(
-            source=parsed.video,
-            source_id=parsed.camera_id,
-            fallback_fps=parsed.fps,
-        )
-        detector = create_detector(config)
-        zones = config.get_configured_zones()
-        zone_analyzer = ZoneAnalyzer(zones=zones, reference_point_strategy=config.reference_point_strategy)
-
-        pipeline = CVPipeline(
-            config=config,
-            video_source=source,
-            detector=detector,
-            zone_analyzer=zone_analyzer,
-        )
-        pipeline.initialize()
+        pipeline = CVPipeline.from_config(config=config, auto_init=True)
     except (ModelLoadingError, VideoSourceError) as init_err:
         logger.error("Initialization failure: %s", init_err)
         return 2
@@ -195,12 +215,14 @@ def run_cli(args: Optional[List[str]] = None) -> int:
     frames_processed = 0
     total_person_detections = 0
     total_zone_incursions = 0
+    total_events_emitted = 0
 
     try:
         for result in pipeline.process_stream(max_frames=parsed.max_frames):
             frames_processed += 1
             total_person_detections += len(result.detections)
             total_zone_incursions += len(result.inside_zone_results)
+            total_events_emitted += len(result.events)
 
             if parsed.per_frame_json:
                 print(json.dumps(result.to_dict()))
@@ -224,9 +246,12 @@ def run_cli(args: Optional[List[str]] = None) -> int:
         "model_type": config.model_type,
         "model_path": config.model_path,
         "confidence_threshold": config.confidence_threshold,
+        "backend_url": config.backend_url,
+        "events_enabled": config.events_enabled,
         "frames_processed": frames_processed,
         "total_person_detections": total_person_detections,
         "total_zone_incursions": total_zone_incursions,
+        "total_events_emitted": total_events_emitted,
         "elapsed_seconds": round(elapsed_time, 3),
         "average_fps": round(avg_fps, 2),
     }
@@ -235,7 +260,7 @@ def run_cli(args: Optional[List[str]] = None) -> int:
         print(json.dumps(summary, indent=2))
     else:
         print("\n========================================================")
-        print(" SENTINELAI CV ENGINE — VIDEO & ZONE PROCESSING SUMMARY")
+        print(" SENTINELAI CV ENGINE — VIDEO & EVENT PROCESSING SUMMARY")
         print("========================================================")
         print(f" Video Source:            {summary['video_source']}")
         print(f" Camera ID:               {summary['camera_id']}")
@@ -243,9 +268,12 @@ def run_cli(args: Optional[List[str]] = None) -> int:
         print(f" Ground Contact Strategy: {summary['reference_point_strategy']}")
         print(f" Model Type:              {summary['model_type']} ({summary['model_path']})")
         print(f" Confidence Threshold:    {summary['confidence_threshold']}")
+        print(f" Backend URL:             {summary['backend_url']}")
+        print(f" Events Enabled:          {summary['events_enabled']}")
         print(f" Frames Processed:        {summary['frames_processed']}")
         print(f" Total Person Detections: {summary['total_person_detections']}")
         print(f" Total Zone Incursions:   {summary['total_zone_incursions']}")
+        print(f" Total Events Emitted:    {summary['total_events_emitted']}")
         print(f" Processing Time:         {summary['elapsed_seconds']}s")
         print(f" Average Processing FPS:  {summary['average_fps']} FPS")
         print("========================================================\n")
