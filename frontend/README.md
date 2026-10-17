@@ -237,7 +237,7 @@ Demonstration records are strictly segregated and visibly identified:
 - **Phase 2 (Dashboard Pages):** Complete interfaces for Live Monitoring, Security Events, Camera Registry, Restricted Zones, Surveillance Analytics, and System Health.
 - **Phase 3 (Backend Integration & Contracts):** Centralized `ApiClient`, typed error wrappers, configurable `VITE_API_BASE_URL`, and 12 contract tests.
 - **Phase 4 (Real-Time Monitoring & Telemetry):** `EventStreamService` polling loop, event deduplication, notification drawer, audio alert preference, and 20 real-time tests.
-- **Phase 5 (Final QA, Hardening & Handover):** Universal `ErrorBoundary`, crash-resilient formatters, WCAG keyboard accessibility, skip-to-content links, 51 passing automated tests, and comprehensive handover guide (`leads/lead-1-frontend/HANDOVER.md`).
+- **Phase 5 (Final QA, Hardening & Handover):** Universal `ErrorBoundary`, crash-resilient formatters, WCAG keyboard accessibility, skip-to-content links, and comprehensive automated test suite.
 
 ---
 

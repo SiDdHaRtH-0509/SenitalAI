@@ -158,17 +158,11 @@ sentinel-ai/
 ├── DEMO_GUIDE.md                       # Comprehensive operator demonstration guide
 ├── DEMO_SCRIPT.md                      # Step-by-step presentation script for evaluators
 ├── ENVIRONMENT_SETUP.md                # Environment preparation for Windows and Linux
-├── EXECUTION_PLAN.md                   # Phased project delivery plan and milestones
-├── GITHUB_SETUP.md                     # Team GitHub repository instructions
 ├── IBM_Z_PLAN.md                       # IBM Z and LinuxONE integration strategy
 ├── INTEGRATION_TESTING.md              # End-to-end integration testing guide
 ├── LINUXONE_DEPLOYMENT.md              # LinuxONE containerization and setup instructions
 ├── PROJECT_CONTEXT.md                  # Mission context, background, and objectives
-├── PROJECT_LEAD_PLAYBOOK.md            # Team leadership and delivery guidelines
 ├── RELEASE_CHECKLIST.md                # Pre-release validation and readiness checklist
-├── REPOSITORY_STATUS.md                # High-level repository health summary
-├── TASK_BOARD.md                       # Live task tracking across project phases
-├── TEAM_ROLES.md                       # Ownership matrix for Workstreams and Leads
 ├── pytest.ini                          # Root pytest configuration
 ├── .env.example                        # Root environment variables template
 ├── .gitignore                          # Git exclusion rules
@@ -220,12 +214,6 @@ sentinel-ai/
 │   ├── PHASE_2_ACCEPTANCE_TEST_REPORT.md # Live event pipeline verification report
 │   ├── PHASE_3_LINUXONE_REPORT.md      # LinuxONE deployment validation report
 │   └── PHASE_4_RELEASE_READINESS.md    # Release readiness and security audit report
-├── leads/                              # Workstream Lead Guides & Prompts
-│   ├── lead-1-frontend/
-│   ├── lead-2-computer-vision/
-│   ├── lead-3-linuxone/
-│   └── lead-4-support/
-├── prompts/                            # Prompt engineering reference templates
 ├── scripts/                            # Operational utilities (e.g., RTSP stream simulator)
 └── tests/                              # Shared end-to-end integration tests
 ```
@@ -489,16 +477,16 @@ In adherence to datathon transparency standards, the following boundaries and op
 
 ---
 
-## 17. Team Collaboration
+## 17. Engineering Architecture & Modules
 
-SentinelAI was built using a multi-lead collaborative structure documented in the repository:
-- **Project Lead:** Architecture, shared contracts, backend risk engine, integration.
-- **Lead 1 (Frontend):** Operator dashboard, real-time UI components, triage modal ([leads/lead-1-frontend/](leads/lead-1-frontend/)).
-- **Lead 2 (Computer Vision):** Video sources, YOLOv8n detector, polygon zone geometry ([leads/lead-2-computer-vision/](leads/lead-2-computer-vision/)).
-- **Lead 3 (LinuxONE):** Container packaging, s390x compatibility, deployment assets ([leads/lead-3-linuxone/](leads/lead-3-linuxone/)).
-- **Lead 4 (QA & Support):** Test suites, verification scripts, documentation, and demo support ([leads/lead-4-support/](leads/lead-4-support/)).
+SentinelAI is structured into modular engineering domains:
+- **Central Backend & Security:** FastAPI REST API, multi-factor risk scoring engine, JWT/RBAC, and SHA-256 audit log chaining (`backend/`).
+- **Frontend Dashboard:** Operator command center, real-time event alerts, triage modals, and system telemetry (`frontend/`).
+- **Edge Computer Vision:** Video ingestion (RTSP/MP4), YOLOv8n detector, and polygonal zone analysis (`cv-engine/`).
+- **LinuxONE & Deployment:** Container packaging (`deploy/Dockerfile.linuxone`) and IBM LinuxONE (s390x) compatibility.
+- **Verification & QA:** End-to-end test suites, verification benchmarks, and live demonstration assets (`tests/`, `scripts/`).
 
-For branching rules and contribution guidelines, see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`TEAM_ROLES.md`](TEAM_ROLES.md).
+For contribution guidelines and development workflow, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 

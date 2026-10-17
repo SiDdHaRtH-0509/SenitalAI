@@ -33,8 +33,8 @@ LinuxONE is a deployment target, not an assumed dependency for every component. 
 - `backend/`: Overall Lead only. API schemas, risk engine, storage, backend tests.
 - `frontend/`: Lead 1 only. Dashboard, API client, frontend types/components.
 - `cv-engine/`: Lead 2 only. Video reader, detector adapter, zone logic, event producer.
-- `deploy/` and deployment docs: Lead 3. Environment inspection, deployment scripts/configuration, architecture-specific compatibility notes. Do not duplicate application logic.
-- `leads/lead-4-support/`, root docs and test coordination: Lead 4 maintains support materials; owners retain responsibility for code in their modules.
+- `deploy/` and deployment docs: Environment inspection, deployment scripts/configuration, and architecture-specific compatibility notes. Do not duplicate application logic.
+- Documentation and test coordination: Owners maintain testing and support materials for their modules.
 - Overall Lead approves contract changes and merges PRs.
 
 ## Required design choices

@@ -18,7 +18,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in README.md PROJECT_CONTEXT.md ARCHITECTURE.md API_CONTRACT.md TEAM_ROLES.md TASK_BOARD.md; do
+          for file in README.md PROJECT_CONTEXT.md ARCHITECTURE.md API_CONTRACT.md; do
             test -s "$file" || { echo "Missing or empty required file: $file"; exit 1; }
           done
       - name: Reject committed real environment file

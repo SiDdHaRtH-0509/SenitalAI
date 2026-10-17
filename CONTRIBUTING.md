@@ -3,7 +3,7 @@
 ## Workflow
 1. Confirm the official Datathon rules before writing or reusing code/assets.
 2. Pull the latest `main`; create your assigned branch from it.
-3. Read your Lead folder and the shared `API_CONTRACT.md`.
+3. Read the architecture specifications and the shared `API_CONTRACT.md`.
 4. Work in your owned module; do not overwrite another lead's work.
 5. Run available tests and report exact commands/results.
 6. Push small commits and open a pull request. The Overall Project Lead reviews and merges.
