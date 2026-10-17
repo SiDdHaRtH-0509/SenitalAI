@@ -113,9 +113,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         />
       </div>
 
-      {/* Row 1: Surveillance Feeds (Empty State) & Subsystem Health */}
+      {/* Row 1: Surveillance Feeds (Live Video Demo) & Subsystem Health */}
       <div className="dashboard-split-row">
-        <MonitoringPanel cameras={cameras} />
+        <MonitoringPanel cameras={cameras} onRefresh={onRefresh} />
         <SystemHealthPanel healthState={health} onRefreshHealth={onRefresh} />
       </div>
 

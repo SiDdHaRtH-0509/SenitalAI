@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { VideoOff, Radio, Eye, Filter, RefreshCw, Info } from 'lucide-react';
+import { VideoOff, Radio, Eye, Filter, RefreshCw } from 'lucide-react';
 import { CameraInfo } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { CameraDetailModal } from '../components/dashboard/CameraDetailModal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { safeLower } from '../utils/formatters';
+import { VideoAnalyticsDemoPlayer } from '../components/dashboard/VideoAnalyticsDemoPlayer';
 
 interface MonitoringPageProps {
   cameras: CameraInfo[];
@@ -87,28 +88,18 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
         </div>
       </div>
 
-      {/* Honest Technical Status Notice */}
-      <div
-        style={{
-          backgroundColor: 'rgba(245, 158, 11, 0.08)',
-          border: '1px solid rgba(245, 158, 11, 0.25)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: '12px',
-          color: 'var(--color-warning)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Info size={16} />
-          <span>
-            <strong>Stream Ingestion Status:</strong> No live CCTV video streams are currently broadcasting to this browser. The CV engine processes video files on edge nodes via OpenCV; web streaming integration is scheduled for later phases.
-          </span>
-        </div>
-        <span className="badge badge-disconnected" style={{ whiteSpace: 'nowrap' }}>
-          0 OF {cameras.length} FEEDS ACTIVE
+      {/* Interactive YOLO Surveillance Demo Feed */}
+      <div style={{ marginBottom: 'var(--space-lg)' }}>
+        <VideoAnalyticsDemoPlayer onEventSubmitted={onRefresh} />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          Configured CCTV Node Feeds
+        </h3>
+        <span className="badge badge-connected">
+          <span className="badge-dot" style={{ backgroundColor: '#22c55e' }} />
+          {cameras.length} NODES CONFIGURED
         </span>
       </div>
 
