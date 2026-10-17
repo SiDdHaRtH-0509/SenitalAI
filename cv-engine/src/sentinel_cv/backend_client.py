@@ -18,6 +18,8 @@ Key Features & Reliability Controls:
 
 import json
 import logging
+import os
+from pathlib import Path
 import socket
 import time
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -27,6 +29,30 @@ import urllib.request
 from sentinel_cv.interfaces import IBackendClient
 from sentinel_cv.logging_config import get_logger
 from sentinel_cv.models import EventSubmissionResult, SecurityEvent
+
+
+def _load_dotenv_if_present() -> None:
+    """Load environment variables from .env if present without external dependencies."""
+    search_paths = [Path.cwd() / ".env"] + [p / ".env" for p in Path(__file__).resolve().parents]
+    for env_path in search_paths:
+        if env_path.is_file():
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        key, val = line.split("=", 1)
+                        key = key.strip()
+                        val = val.strip().strip("'\"")
+                        if key and key not in os.environ:
+                            os.environ[key] = val
+                break
+            except Exception:
+                pass
+
+
+_load_dotenv_if_present()
 
 # Transport callable signature: (Request, timeout) -> (status_code, response_bytes, headers_dict)
 TransportFunc = Callable[[urllib.request.Request, float], Tuple[int, bytes, Dict[str, str]]]
@@ -54,6 +80,7 @@ class BackendClient(IBackendClient):
         max_retries: int = 2,
         retry_backoff_seconds: float = 0.5,
         events_enabled: bool = True,
+        api_key: Optional[str] = None,
         transport: Optional[TransportFunc] = None,
     ) -> None:
         """Initialize the backend client.
@@ -64,6 +91,7 @@ class BackendClient(IBackendClient):
             max_retries: Maximum number of bounded retries for transient errors.
             retry_backoff_seconds: Initial backoff duration between retries.
             events_enabled: If False, event submission is disabled and returns early.
+            api_key: Optional explicit M2M service key.
             transport: Optional custom transport function for deterministic testing.
         """
         if not base_url or not str(base_url).strip():
@@ -80,6 +108,13 @@ class BackendClient(IBackendClient):
         self.max_retries = max_retries
         self.retry_backoff_seconds = retry_backoff_seconds
         self.events_enabled = events_enabled
+        self.api_key = (
+            api_key
+            or os.getenv("SENTINEL_SERVICE_API_KEY")
+            or os.getenv("SENTINEL_API_KEY")
+            or os.getenv("SENTINEL_SERVICE_TOKEN")
+            or ""
+        )
         self._transport = transport or default_urllib_transport
         self.logger = get_logger("backend_client")
 
@@ -93,6 +128,9 @@ class BackendClient(IBackendClient):
         req = urllib.request.Request(url, method="GET")
         req.add_header("Accept", "application/json")
         req.add_header("User-Agent", "SentinelAI-CV-Engine/1.0")
+        if self.api_key:
+            req.add_header("Authorization", f"Bearer {self.api_key}")
+            req.add_header("X-API-Key", self.api_key)
 
         try:
             status_code, body, _ = self._transport(req, self.timeout_seconds)
@@ -139,14 +177,19 @@ class BackendClient(IBackendClient):
         url = f"{self.base_url}/api/events"
         payload_bytes = json.dumps(event.to_dict()).encode("utf-8")
 
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "SentinelAI-CV-Engine/1.0",
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["X-API-Key"] = self.api_key
+
         req = urllib.request.Request(
             url,
             data=payload_bytes,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "User-Agent": "SentinelAI-CV-Engine/1.0",
-            },
+            headers=headers,
             method="POST",
         )
 

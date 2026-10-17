@@ -1,7 +1,7 @@
 """Service for Restricted Zones management."""
 
 import json
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.models.zone import ZoneModel
 from app.schemas.zone import RestrictedZoneCreate
@@ -123,3 +123,14 @@ def seed_default_zones(db: Session) -> None:
                 )
             )
         db.commit()
+
+
+def get_zone_by_id(db: Session, zone_id: str) -> Optional[ZoneModel]:
+    """Retrieve a restricted zone by its identifier."""
+    return db.query(ZoneModel).filter(ZoneModel.zone_id == zone_id).first()
+
+
+def get_zone_by_camera(db: Session, camera_id: str) -> Optional[ZoneModel]:
+    """Retrieve the primary restricted zone monitored by a camera."""
+    return db.query(ZoneModel).filter(ZoneModel.camera_id == camera_id).first()
+

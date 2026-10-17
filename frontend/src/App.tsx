@@ -9,6 +9,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { SystemHealthPage } from './pages/SystemHealthPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { EventDetailModal } from './components/dashboard/EventDetailModal';
+import { LoginModal } from './components/auth/LoginModal';
 import {
   NavigationPage,
   SecurityEvent,
@@ -19,6 +20,7 @@ import {
   ConnectionState,
   SecurityNotification,
   EventStatus,
+  UserProfile,
 } from './types';
 import {
   fetchDashboardStats,
@@ -32,6 +34,7 @@ import {
   createNotificationFromEvent,
   mergeNotifications,
   playGentleAudioAlert,
+  getCurrentUserProfile,
 } from './services/api';
 import {
   DEMO_EVENTS,
@@ -39,6 +42,7 @@ import {
   INITIAL_SYSTEM_HEALTH,
   DEMO_CAMERAS,
   DEFAULT_CLIENT_SETTINGS,
+  DEMO_OPERATOR_USER,
 } from './data/demoData';
 
 // Map between URL hash/paths and NavigationPage keys
@@ -91,8 +95,37 @@ export const App: React.FC = () => {
   const [highlightedEventIds, setHighlightedEventIds] = useState<Set<string>>(new Set());
   const [inspectedEvent, setInspectedEvent] = useState<SecurityEvent | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem('sentinel_auth_user');
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return DEMO_OPERATOR_USER;
+  });
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const highlightTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Probe authenticated user identity on mount
+  useEffect(() => {
+    let isMounted = true;
+    getCurrentUserProfile().then((res) => {
+      if (isMounted && res.data) {
+        setCurrentUser(res.data);
+      }
+    }).catch(() => {
+      // Keep demo fallback
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Load client preferences and camera registry on mount
   useEffect(() => {
@@ -361,6 +394,8 @@ export const App: React.FC = () => {
       onSelectEventById={handleSelectEventById}
       onManualRefresh={loadData}
       isRefreshing={isRefreshing}
+      currentUser={currentUser}
+      onOpenLoginModal={() => setIsLoginModalOpen(true)}
     >
       {renderActivePage()}
 
@@ -369,6 +404,21 @@ export const App: React.FC = () => {
         event={inspectedEvent}
         onClose={() => setInspectedEvent(null)}
         onStatusChange={handleStatusChange}
+      />
+
+      {/* Identity & Access Login Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        currentUser={currentUser}
+        onAuthSuccess={(user) => {
+          setCurrentUser(user);
+          loadData();
+        }}
+        onLogoutSuccess={() => {
+          setCurrentUser(DEMO_OPERATOR_USER);
+          loadData();
+        }}
       />
     </AppShell>
   );

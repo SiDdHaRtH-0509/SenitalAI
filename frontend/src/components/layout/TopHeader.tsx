@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Check,
 } from 'lucide-react';
-import { NavigationPage, ConnectionState, SecurityNotification } from '../../types';
+import { NavigationPage, ConnectionState, SecurityNotification, UserProfile } from '../../types';
 import { StatusBadge } from '../ui/StatusBadge';
 
 interface TopHeaderProps {
@@ -26,6 +26,8 @@ interface TopHeaderProps {
   onSelectEventById: (eventId: string) => void;
   onManualRefresh: () => Promise<void>;
   isRefreshing: boolean;
+  currentUser?: UserProfile | null;
+  onOpenLoginModal?: () => void;
 }
 
 const PAGE_TITLES: Record<NavigationPage, { title: string; subtitle: string }> = {
@@ -77,6 +79,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSelectEventById,
   onManualRefresh,
   isRefreshing,
+  currentUser,
+  onOpenLoginModal,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -413,14 +417,42 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           )}
         </div>
 
-        {/* Demo User Profile */}
-        <div className="user-profile">
-          <div className="user-avatar" aria-hidden="true">
-            OP
+        {/* Authenticated User Profile & Identity Switcher */}
+        <div
+          className="user-profile"
+          onClick={onOpenLoginModal}
+          role="button"
+          tabIndex={0}
+          aria-label="User identity profile. Click to sign in or switch roles."
+          style={{ cursor: 'pointer' }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenLoginModal?.();
+            }
+          }}
+          title="Click to authenticate, switch account, or log out"
+        >
+          <div
+            className="user-avatar"
+            aria-hidden="true"
+            style={{
+              backgroundColor: currentUser?.role === 'ADMIN' ? '#7e22ce' : '#0284c7',
+              color: '#ffffff',
+              fontWeight: 700,
+            }}
+          >
+            {currentUser ? (currentUser.role === 'ADMIN' ? 'AD' : 'OP') : 'OP'}
           </div>
           <div className="user-meta">
-            <span className="user-name">Operator 04</span>
-            <span className="user-role">Watch Officer (Demo)</span>
+            <span className="user-name">
+              {currentUser ? currentUser.username : 'Operator 04'}
+            </span>
+            <span className="user-role">
+              {currentUser
+                ? `${currentUser.role === 'ADMIN' ? 'Administrator' : 'Watch Officer'} (${currentUser.role})`
+                : 'Watch Officer (Demo)'}
+            </span>
           </div>
         </div>
       </div>

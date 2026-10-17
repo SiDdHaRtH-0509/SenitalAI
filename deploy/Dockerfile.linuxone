@@ -1,0 +1,42 @@
+# SentinelAI Backend — IBM LinuxONE (s390x) Containerfile
+FROM python:3.11-slim
+
+LABEL maintainer="SentinelAI DevOps Lead" \
+      platform="IBM LinuxONE (s390x)" \
+      description="FastAPI Backend & Risk Assessment Engine for s390x"
+
+WORKDIR /app
+
+# Install build dependencies for s390x native extension compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    sqlite3 \
+    gcc \
+    python3-dev \
+    libc6-dev \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install verified s390x Python dependencies
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Copy backend application code and shared CV contracts
+COPY backend/app /app/app
+COPY cv-engine/src/sentinel_cv /app/sentinel_cv
+COPY pytest.ini /app/pytest.ini
+
+# Environment defaults for LinuxONE container
+ENV PYTHONPATH=/app \
+    PORT=8000 \
+    HOST=0.0.0.0 \
+    ENVIRONMENT=production \
+    SQLITE_DB_PATH=/app/sentinel.db
+
+EXPOSE 8000
+
+# Healthcheck for container orchestration
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
+
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

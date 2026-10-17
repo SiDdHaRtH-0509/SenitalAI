@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopHeader } from './TopHeader';
-import { NavigationPage, ConnectionState, SecurityNotification } from '../../types';
+import { NavigationPage, ConnectionState, SecurityNotification, UserProfile } from '../../types';
 import { DEMO_DATA_NOTICE } from '../../data/demoData';
 import { Info } from 'lucide-react';
 
@@ -20,6 +20,8 @@ interface AppShellProps {
   onSelectEventById: (eventId: string) => void;
   onManualRefresh: () => Promise<void>;
   isRefreshing: boolean;
+  currentUser?: UserProfile | null;
+  onOpenLoginModal?: () => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -37,6 +39,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   onSelectEventById,
   onManualRefresh,
   isRefreshing,
+  currentUser,
+  onOpenLoginModal,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -94,6 +98,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           onSelectEventById={onSelectEventById}
           onManualRefresh={onManualRefresh}
           isRefreshing={isRefreshing}
+          currentUser={currentUser}
+          onOpenLoginModal={onOpenLoginModal}
         />
 
         {/* Page Content Body */}

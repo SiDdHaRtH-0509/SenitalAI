@@ -35,6 +35,12 @@ from sentinel_cv.models import (
     ZoneAnalysisResult,
 )
 from sentinel_cv.pipeline import CVPipeline
+from sentinel_cv.rtsp_source import (
+    RTSPConnectionState,
+    RTSPVideoSource,
+    is_rtsp_url,
+    redact_stream_url,
+)
 from sentinel_cv.video_source import (
     OpenCVVideoSource,
     ReplayVideoSource,
@@ -65,7 +71,10 @@ __all__ = [
     "OpenCVVideoSource",
     "PipelineResult",
     "PolygonZone",
+    "redact_stream_url",
     "ReplayVideoSource",
+    "RTSPConnectionState",
+    "RTSPVideoSource",
     "SecurityEvent",
     "VideoSourceError",
     "YOLOPersonDetector",
@@ -75,6 +84,7 @@ __all__ = [
     "create_replay_detector",
     "create_video_source",
     "get_logger",
+    "is_rtsp_url",
     "setup_logging",
 ]
 

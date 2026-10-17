@@ -1,7 +1,53 @@
-"""Pydantic schemas for Camera edge devices."""
+"""Pydantic schemas for Camera edge devices and real-time processing workers."""
 
+import re
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+import urllib.parse
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def redact_uri(v: Optional[str]) -> Optional[str]:
+    """Redact passwords from stream URIs for safe API delivery."""
+    if not v or not isinstance(v, str):
+        return v
+    try:
+        p = urllib.parse.urlsplit(v)
+        if p.password:
+            netloc = f"{p.username}:***@{p.hostname}"
+            if p.port:
+                netloc += f":{p.port}"
+            return urllib.parse.urlunsplit((p.scheme, netloc, p.path, p.query, p.fragment))
+        return v
+    except Exception:
+        return re.sub(r"://([^:@]+):([^@]+)@", r"://\1:***@", v)
+
+
+class CameraWorkerStatus(BaseModel):
+    """Real-time operational metrics and connection state for a camera worker."""
+
+    camera_id: str
+    is_running: bool = False
+    connection_state: str = "STOPPED"
+    fps: float = 0.0
+    latency_ms: float = 0.0
+    frames_processed: int = 0
+    events_emitted: int = 0
+    reconnect_count: int = 0
+    last_frame_timestamp: Optional[str] = None
+    error_message: Optional[str] = None
+    stream_uri_redacted: Optional[str] = None
+    is_demo: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CameraStartRequest(BaseModel):
+    """Payload to start a camera processing worker."""
+
+    replay_mode: bool = Field(
+        False,
+        description="Whether to execute in synthetic replay/demo mode if live RTSP is unreachable"
+    )
 
 
 class CameraCreate(BaseModel):
@@ -19,7 +65,7 @@ class CameraCreate(BaseModel):
 
 
 class CameraResponse(BaseModel):
-    """Schema returned to frontend and monitoring components."""
+    """Schema returned to frontend and monitoring components with sanitized credentials."""
 
     camera_id: str
     name: str
@@ -30,5 +76,11 @@ class CameraResponse(BaseModel):
     zone_id: str
     stream_uri: Optional[str] = None
     last_ping: Optional[str] = None
+    worker_status: Optional[CameraWorkerStatus] = None
+
+    @field_validator("stream_uri", mode="before")
+    @classmethod
+    def mask_stream_uri(cls, v: Optional[str]) -> Optional[str]:
+        return redact_uri(v)
 
     model_config = ConfigDict(from_attributes=True)

@@ -6,6 +6,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.deps import require_roles
+from app.core.security import ROLE_ADMIN, ROLE_OPERATOR, ROLE_SERVICE
+from app.models.user import User
 from app.schemas.event import (
     SecurityEventCreate,
     SecurityEventResponse,
@@ -19,6 +22,7 @@ from app.services.event_service import (
     get_security_event_by_id,
     update_event_status,
 )
+from app.services.audit_service import record_audit
 
 router = APIRouter()
 
@@ -36,9 +40,13 @@ def list_events(
     risk_level: Optional[str] = Query(None, description="Filter by risk level (LOW, MEDIUM, HIGH, CRITICAL)"),
     status: Optional[str] = Query(None, description="Filter by review status (NEW, ACKNOWLEDGED, RESOLVED)"),
     event_type: Optional[str] = Query(None, description="Filter by event type"),
+    current_user: User = Depends(require_roles([ROLE_OPERATOR, ROLE_ADMIN, ROLE_SERVICE])),
     db: Session = Depends(get_db),
 ) -> List[SecurityEventResponse]:
-    """Retrieve stored security events ordered newest-first with filtering and pagination."""
+    """Retrieve stored security events ordered newest-first with filtering and pagination.
+    
+    Protected: Requires authenticated OPERATOR, ADMIN, or SERVICE identity.
+    """
     events = get_security_events(
         db=db,
         limit=limit,
@@ -80,14 +88,27 @@ def list_events(
 )
 def submit_event(
     event_in: SecurityEventCreate,
+    current_user: User = Depends(require_roles([ROLE_SERVICE, ROLE_ADMIN])),
     db: Session = Depends(get_db),
 ):
     """Ingest a validated security event from the Computer Vision engine.
 
     Evaluates explainable risk heuristic if not precomputed, stores the record
-    in persistent storage, and enforces strict idempotency against duplicate submissions.
+    in persistent storage, enforces strict idempotency against duplicate submissions,
+    and appends an immutable security audit record.
     """
     db_event, is_duplicate = create_security_event(db, event_in)
+
+    record_audit(
+        db=db,
+        action="EVENT_INGESTED",
+        target_type="security_event",
+        actor_username=current_user.username,
+        actor_role=current_user.role,
+        target_id=db_event.event_id,
+        outcome="DUPLICATE" if is_duplicate else "SUCCESS",
+        details=f"Camera: {db_event.camera_id}, Risk: {db_event.risk_level} ({db_event.risk_score})",
+    )
 
     if is_duplicate:
         # Idempotent response per API_CONTRACT.md and CV client integration
@@ -131,9 +152,13 @@ def submit_event(
 )
 def get_event(
     event_id: str,
+    current_user: User = Depends(require_roles([ROLE_OPERATOR, ROLE_ADMIN, ROLE_SERVICE])),
     db: Session = Depends(get_db),
 ) -> SecurityEventResponse:
-    """Retrieve full details of a single security event by its unique ID."""
+    """Retrieve full details of a single security event by its unique ID.
+    
+    Protected: Requires authenticated OPERATOR, ADMIN, or SERVICE identity.
+    """
     db_event = get_security_event_by_id(db, event_id)
     if not db_event:
         raise HTTPException(
@@ -170,20 +195,50 @@ def get_event(
 def update_status(
     event_id: str,
     status_in: EventStatusUpdateRequest,
+    current_user: User = Depends(require_roles([ROLE_OPERATOR, ROLE_ADMIN])),
     db: Session = Depends(get_db),
 ) -> SecurityEventResponse:
-    """Update the triage status and append commentary notes for a security incident."""
+    """Update the triage status and append commentary notes for a security incident.
+    
+    Appends an immutable audit log recording the operator identity, transition, and commentary.
+    """
+    operator_note = (
+        f"[{current_user.username}] {status_in.notes}"
+        if status_in.notes
+        else f"Status set by {current_user.username}"
+    )
     updated = update_event_status(
         db=db,
         event_id=event_id,
         target_status=status_in.status,
-        notes=status_in.notes,
+        notes=operator_note,
     )
     if not updated:
+        record_audit(
+            db=db,
+            action="EVENT_STATUS_UPDATE_FAILED",
+            target_type="security_event",
+            actor_username=current_user.username,
+            actor_role=current_user.role,
+            target_id=event_id,
+            outcome="FAILURE",
+            details=f"Target status: {status_in.status}. Event not found.",
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Security event '{event_id}' not found.",
         )
+
+    record_audit(
+        db=db,
+        action="EVENT_STATUS_UPDATED",
+        target_type="security_event",
+        actor_username=current_user.username,
+        actor_role=current_user.role,
+        target_id=event_id,
+        outcome="SUCCESS",
+        details=f"New status: {status_in.status}, Notes: {status_in.notes or ''}",
+    )
 
     return SecurityEventResponse(
         event_id=updated.event_id,
@@ -213,11 +268,13 @@ def update_status(
 )
 def submit_events_batch(
     batch_in: BatchEventCreate,
+    current_user: User = Depends(require_roles([ROLE_SERVICE, ROLE_ADMIN])),
     db: Session = Depends(get_db),
 ) -> BatchEventResponse:
     """Ingest a batch of security events from CV pipeline.
 
-    Validates each event, persists non-duplicates, and reports detailed outcomes.
+    Validates each event, persists non-duplicates, reports detailed outcomes,
+    and appends a batch audit log record.
     """
     created_count = 0
     duplicate_count = 0
@@ -254,6 +311,16 @@ def submit_events_batch(
             )
         except Exception as exc:
             errors.append(f"Failed to process '{item.event_id}': {str(exc)}")
+
+    record_audit(
+        db=db,
+        action="EVENT_BATCH_INGESTED",
+        target_type="security_event",
+        actor_username=current_user.username,
+        actor_role=current_user.role,
+        outcome="SUCCESS",
+        details=f"Total: {len(batch_in.events)}, Created: {created_count}, Duplicates: {duplicate_count}, Errors: {len(errors)}",
+    )
 
     return BatchEventResponse(
         total=len(batch_in.events),

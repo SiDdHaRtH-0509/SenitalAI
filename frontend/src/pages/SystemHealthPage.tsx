@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { SystemHealthState } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { getApiBaseUrl } from '../services/apiClient';
 
 interface SystemHealthPageProps {
   health: SystemHealthState;
@@ -23,7 +24,7 @@ export const SystemHealthPage: React.FC<SystemHealthPageProps> = ({ health, onRe
     setIsProbing(true);
     const timestamp = new Date().toLocaleTimeString();
     setProbeLog((prev) => [
-      `[${timestamp}] Initiating probe to http://localhost:8000/api/health...`,
+      `[${timestamp}] Initiating probe to ${getApiBaseUrl()}/api/health...`,
       ...prev.slice(0, 8),
     ]);
 
@@ -237,7 +238,7 @@ export const SystemHealthPage: React.FC<SystemHealthPageProps> = ({ health, onRe
           <div style={{ padding: '8px 0', borderTop: '1px solid var(--color-border-subtle)', borderBottom: '1px solid var(--color-border-subtle)', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Target Host:</span>
-              <span style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>http://localhost:8000</span>
+              <span style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-mono)' }}>{getApiBaseUrl()}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Health Endpoint:</span>

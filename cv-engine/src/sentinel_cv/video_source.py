@@ -21,6 +21,12 @@ except ImportError:
 from sentinel_cv.interfaces import IVideoSource
 from sentinel_cv.logging_config import get_logger
 from sentinel_cv.models import FrameMetadata
+from sentinel_cv.rtsp_source import (
+    RTSPConnectionState,
+    RTSPVideoSource,
+    is_rtsp_url,
+    redact_stream_url,
+)
 
 logger = get_logger("video_source")
 
@@ -378,6 +384,7 @@ def create_video_source(config: Any) -> IVideoSource:
 
     If input_source_type is 'replay' or replay_mode is active and the video file
     does not exist locally, falls back to ReplayVideoSource.
+    If input_source_type is 'stream' or video_source is an RTSP URI, creates RTSPVideoSource.
 
     Args:
         config: CVConfig containing video configuration.
@@ -399,9 +406,22 @@ def create_video_source(config: Any) -> IVideoSource:
             source_id=getattr(config, "camera_id", "cam-demo-01"),
         )
 
+    v_source = str(getattr(config, "video_source", "sample-data/demo.mp4"))
+    source_type = getattr(config, "input_source_type", "file")
+
+    if is_rtsp_url(v_source) or source_type in ("stream", "rtsp"):
+        logger.info("Initializing RTSPVideoSource for live surveillance stream: %s", redact_stream_url(v_source))
+        return RTSPVideoSource(
+            url=v_source,
+            source_id=getattr(config, "camera_id", "cam-demo-01"),
+            fallback_fps=getattr(config, "target_fps", 20.0),
+            synthetic_fallback=getattr(config, "replay_mode", False),
+        )
+
     return OpenCVVideoSource(
-        source=getattr(config, "video_source", "sample-data/demo.mp4"),
+        source=v_source,
         source_id=getattr(config, "camera_id", "cam-demo-01"),
         fallback_fps=getattr(config, "target_fps", 25.0),
     )
+
 

@@ -32,6 +32,7 @@ htmlcov/
 *.weights
 *.bin
 *.mp4
+!sample-data/examples/*.mp4
 *.avi
 *.mov
 *.mkv

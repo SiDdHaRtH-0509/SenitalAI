@@ -22,18 +22,32 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-# Ensure cv-engine/src is resolvable
-cv_src = Path(__file__).resolve().parents[4] / "cv-engine" / "src"
-if str(cv_src) not in sys.path:
-    sys.path.insert(0, str(cv_src))
+# Ensure cv-engine/src is resolvable if present in workspace
+for parent in Path(__file__).resolve().parents:
+    candidate = parent / "cv-engine" / "src"
+    if candidate.is_dir():
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+        break
+
+try:
+    from sentinel_cv.config import CVConfig
+    from sentinel_cv.models import BoundingBox, Detection, FrameMetadata, SecurityEvent
+    from sentinel_cv.pipeline import CVPipeline
+    from sentinel_cv.backend_client import BackendClient
+    HAS_SENTINEL_CV = True
+except ImportError:
+    HAS_SENTINEL_CV = False
 
 from app.database import Base, get_db
 from app.models.event import EventModel
 from app.main import app
-from sentinel_cv.config import CVConfig
-from sentinel_cv.models import BoundingBox, Detection, FrameMetadata, SecurityEvent
-from sentinel_cv.pipeline import CVPipeline
-from sentinel_cv.backend_client import BackendClient
+from app.core.security import ROLE_ADMIN, create_access_token
+
+if not HAS_SENTINEL_CV:
+    pytestmark = pytest.mark.skip(
+        reason="cv-engine is an edge component and not present inside standalone backend container"
+    )
 
 
 def make_testclient_transport(test_client: TestClient):
@@ -231,8 +245,10 @@ class TestCVBackendIntegration:
                 pass
 
         app.dependency_overrides[get_db] = override_db2
+        admin_token = create_access_token(subject="admin", role=ROLE_ADMIN)
         try:
             with TestClient(app) as client2:
+                client2.headers["Authorization"] = f"Bearer {admin_token}"
                 # Query the event created prior to restart
                 resp = client2.get("/api/events/evt-persist-test-777")
                 assert resp.status_code == 200

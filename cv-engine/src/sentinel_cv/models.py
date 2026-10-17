@@ -12,7 +12,7 @@ service per API_CONTRACT.md.
 
 from dataclasses import dataclass, field
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass(frozen=True)

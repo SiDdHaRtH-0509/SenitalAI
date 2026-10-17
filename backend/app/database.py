@@ -10,10 +10,11 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 from app.config import settings
 
-# SQLite requires check_same_thread=False for FastAPI concurrency
+# SQLite requires check_same_thread=False and busy timeout for multi-worker concurrency
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
+    connect_args["timeout"] = 30.0
 
 engine = create_engine(
     settings.DATABASE_URL,

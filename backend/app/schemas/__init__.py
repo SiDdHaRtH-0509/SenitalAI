@@ -13,6 +13,16 @@ from app.schemas.event import (
 )
 from app.schemas.camera import CameraCreate, CameraResponse
 from app.schemas.zone import RestrictedZoneCreate, RestrictedZoneResponse
+from app.schemas.user import (
+    RoleEnum,
+    UserCreate,
+    UserResponse,
+    UserLogin,
+    Token,
+    ServiceTokenRequest,
+    ServiceTokenResponse,
+)
+from app.schemas.audit import AuditLogResponse
 
 __all__ = [
     "HealthResponse",
@@ -28,4 +38,12 @@ __all__ = [
     "CameraResponse",
     "RestrictedZoneCreate",
     "RestrictedZoneResponse",
+    "RoleEnum",
+    "UserCreate",
+    "UserResponse",
+    "UserLogin",
+    "Token",
+    "ServiceTokenRequest",
+    "ServiceTokenResponse",
+    "AuditLogResponse",
 ]

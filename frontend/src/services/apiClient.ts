@@ -20,8 +20,11 @@ import type {
   DashboardStatistics,
   SystemHealthState,
   CameraInfo,
+  CameraWorkerStatus,
   RestrictedZoneInfo,
   EventStatus,
+  UserProfile,
+  UserRole,
 } from '../types';
 import {
   DEMO_EVENTS,
@@ -29,6 +32,7 @@ import {
   INITIAL_SYSTEM_HEALTH,
   DEMO_CAMERAS,
   DEMO_ZONES,
+  DEMO_OPERATOR_USER,
 } from '../data/demoData';
 
 // Configurable environment defaults
@@ -101,10 +105,20 @@ export interface ApiResponse<T> {
 export class ApiClient {
   private baseUrl: string;
   private defaultTimeoutMs: number;
+  private authToken: string | null = null;
+  private csrfToken: string | null = null;
 
   constructor(baseUrl: string = getApiBaseUrl(), defaultTimeoutMs: number = getApiTimeoutMs()) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.defaultTimeoutMs = defaultTimeoutMs;
+    // Security Hardening: Ensure sensitive JWT session tokens are never stored in or loaded from localStorage
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem('sentinel_auth_token');
+      } catch {
+        // ignore storage errors
+      }
+    }
   }
 
   public getBaseUrl(): string {
@@ -113,6 +127,40 @@ export class ApiClient {
 
   public setBaseUrl(url: string): void {
     this.baseUrl = url.replace(/\/+$/, '');
+  }
+
+  public setAuthToken(token: string | null, csrfToken: string | null = null): void {
+    this.authToken = token;
+    this.csrfToken = csrfToken;
+    if (!token && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem('sentinel_auth_token');
+        window.localStorage.removeItem('sentinel_auth_user');
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }
+
+  public getAuthToken(): string | null {
+    return this.authToken;
+  }
+
+  public getCsrfToken(): string | null {
+    if (this.csrfToken) {
+      return this.csrfToken;
+    }
+    if (typeof document !== 'undefined' && document.cookie) {
+      const match = document.cookie.match(/(?:^|;\s*)sentinel_csrf_token=([^;]+)/);
+      if (match) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+    return null;
+  }
+
+  public isAuthenticated(): boolean {
+    return Boolean(this.authToken);
   }
 
   /**
@@ -167,6 +215,18 @@ export class ApiClient {
       ...headers,
     };
 
+    if (this.authToken) {
+      requestHeaders['Authorization'] = `Bearer ${this.authToken}`;
+    }
+
+    const isStateChanging = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method.toUpperCase());
+    if (isStateChanging) {
+      const csrf = this.getCsrfToken();
+      if (csrf) {
+        requestHeaders['X-CSRF-Token'] = csrf;
+      }
+    }
+
     if (body !== undefined && body !== null) {
       requestHeaders['Content-Type'] = 'application/json';
     }
@@ -177,6 +237,7 @@ export class ApiClient {
         headers: requestHeaders,
         body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
         signal: combinedSignal,
+        credentials: 'include',
       });
 
       clearTimeout(timeoutId);
@@ -440,6 +501,121 @@ export async function getCameras(signal?: AbortSignal): Promise<ApiResponse<Came
 }
 
 /**
+ * 6.1 Start Camera Processing Worker (POST /api/cameras/{camera_id}/start)
+ */
+export async function startCameraWorker(
+  cameraId: string,
+  replayMode: boolean = false,
+  signal?: AbortSignal
+): Promise<ApiResponse<CameraWorkerStatus>> {
+  try {
+    const status = await apiClient.post<CameraWorkerStatus>(
+      `/api/cameras/${cameraId}/start`,
+      { replay_mode: replayMode },
+      signal
+    );
+    return {
+      data: status,
+      isLive: true,
+      statusCode: 200,
+    };
+  } catch (err: unknown) {
+    const errMsg = err instanceof ApiClientError ? err.message : 'Worker start failed';
+    return {
+      data: {
+        camera_id: cameraId,
+        is_running: false,
+        connection_state: 'FAILED',
+        fps: 0,
+        latency_ms: 0,
+        frames_processed: 0,
+        events_emitted: 0,
+        reconnect_count: 0,
+        error_message: errMsg,
+      },
+      isLive: false,
+      error: errMsg,
+    };
+  }
+}
+
+/**
+ * 6.2 Stop Camera Processing Worker (POST /api/cameras/{camera_id}/stop)
+ */
+export async function stopCameraWorker(
+  cameraId: string,
+  signal?: AbortSignal
+): Promise<ApiResponse<CameraWorkerStatus>> {
+  try {
+    const status = await apiClient.post<CameraWorkerStatus>(
+      `/api/cameras/${cameraId}/stop`,
+      {},
+      signal
+    );
+    return {
+      data: status,
+      isLive: true,
+      statusCode: 200,
+    };
+  } catch (err: unknown) {
+    const errMsg = err instanceof ApiClientError ? err.message : 'Worker stop failed';
+    return {
+      data: {
+        camera_id: cameraId,
+        is_running: false,
+        connection_state: 'STOPPED',
+        fps: 0,
+        latency_ms: 0,
+        frames_processed: 0,
+        events_emitted: 0,
+        reconnect_count: 0,
+        error_message: errMsg,
+      },
+      isLive: false,
+      error: errMsg,
+    };
+  }
+}
+
+/**
+ * 6.3 Get Camera Worker Status (GET /api/cameras/{camera_id}/status)
+ */
+export async function getCameraWorkerStatus(
+  cameraId: string,
+  signal?: AbortSignal
+): Promise<ApiResponse<CameraWorkerStatus>> {
+  try {
+    const status = await apiClient.get<CameraWorkerStatus>(
+      `/api/cameras/${cameraId}/status`,
+      undefined,
+      signal
+    );
+    return {
+      data: status,
+      isLive: true,
+      statusCode: 200,
+    };
+  } catch (err: unknown) {
+    const errMsg = err instanceof ApiClientError ? err.message : 'Status query failed';
+    return {
+      data: {
+        camera_id: cameraId,
+        is_running: false,
+        connection_state: 'STOPPED',
+        fps: 0,
+        latency_ms: 0,
+        frames_processed: 0,
+        events_emitted: 0,
+        reconnect_count: 0,
+        error_message: errMsg,
+      },
+      isLive: false,
+      error: errMsg,
+    };
+  }
+}
+
+/**
  * 7. Restricted Zones (GET /api/zones)
  */
 export async function getRestrictedZones(
@@ -494,3 +670,112 @@ export async function getSystemHealth(signal?: AbortSignal): Promise<SystemHealt
     },
   };
 }
+
+/**
+ * 9. User Authentication (POST /api/auth/login)
+ */
+export async function loginUser(
+  username: string,
+  password: string
+): Promise<ApiResponse<{ token: string; user: UserProfile }>> {
+  try {
+    const tokenResponse = await apiClient.post<{
+      access_token: string;
+      token_type: string;
+      role: UserRole;
+      username: string;
+      expires_in_seconds: number;
+      csrf_token?: string;
+    }>('/api/auth/login', { username, password });
+
+    apiClient.setAuthToken(tokenResponse.access_token, tokenResponse.csrf_token || null);
+
+    // Fetch user profile or synthesize from login response
+    let profile: UserProfile;
+    try {
+      profile = await apiClient.get<UserProfile>('/api/auth/me');
+    } catch {
+      profile = {
+        id: tokenResponse.role === 'ADMIN' ? 1 : 2,
+        username: tokenResponse.username,
+        role: tokenResponse.role,
+        full_name: tokenResponse.role === 'ADMIN' ? 'System Administrator' : 'Border Security Officer',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem('sentinel_auth_user', JSON.stringify(profile));
+      } catch {
+        // ignore storage errors
+      }
+    }
+
+    return {
+      data: { token: tokenResponse.access_token, user: profile },
+      isLive: true,
+      statusCode: 200,
+    };
+  } catch (err: unknown) {
+    const errMsg = err instanceof ApiClientError ? err.message : 'Authentication failed';
+    throw new ApiClientError(errMsg, {
+      status: err instanceof ApiClientError ? err.status : 401,
+      details: err,
+    });
+  }
+}
+
+/**
+ * 10. Logout (POST /api/auth/logout or local token clearance)
+ */
+export async function logoutUser(): Promise<void> {
+  try {
+    if (apiClient.isAuthenticated()) {
+      await apiClient.post('/api/auth/logout', {});
+    }
+  } catch {
+    // Ignore network errors on logout
+  } finally {
+    apiClient.setAuthToken(null, null);
+  }
+}
+
+/**
+ * 11. Current User Profile (GET /api/auth/me)
+ */
+export async function getCurrentUserProfile(
+  signal?: AbortSignal
+): Promise<ApiResponse<UserProfile>> {
+  if (!apiClient.isAuthenticated()) {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const cached = window.localStorage.getItem('sentinel_auth_user');
+      if (cached) {
+        try {
+          return { data: JSON.parse(cached), isLive: false, statusCode: 200 };
+        } catch {
+          // ignore parsing error
+        }
+      }
+    }
+    return {
+      data: DEMO_OPERATOR_USER,
+      isLive: false,
+      error: 'Unauthenticated. Using local operator context.',
+    };
+  }
+
+  try {
+    const profile = await apiClient.get<UserProfile>('/api/auth/me', undefined, signal);
+    return { data: profile, isLive: true, statusCode: 200 };
+  } catch (err: unknown) {
+    const errMsg = err instanceof ApiClientError ? err.message : 'Failed to retrieve profile';
+    return {
+      data: DEMO_OPERATOR_USER,
+      isLive: false,
+      error: `Auth verification unavailable (${errMsg}). Using local operator context.`,
+    };
+  }
+}
+

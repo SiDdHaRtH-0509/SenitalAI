@@ -15,7 +15,30 @@ import type {
   CameraInfo,
   RestrictedZoneInfo,
   ClientSettings,
+  UserProfile,
 } from '../types';
+
+export const DEMO_OPERATOR_USER: UserProfile = {
+  id: 2,
+  username: 'operator',
+  email: 'operator@sentinel.local',
+  full_name: 'Border Security Officer',
+  role: 'OPERATOR',
+  is_active: true,
+  created_at: '2026-10-17T00:00:00Z',
+  last_login: '2026-10-17T08:00:00Z',
+};
+
+export const DEMO_ADMIN_USER: UserProfile = {
+  id: 1,
+  username: 'admin',
+  email: 'admin@sentinel.local',
+  full_name: 'System Administrator',
+  role: 'ADMIN',
+  is_active: true,
+  created_at: '2026-10-17T00:00:00Z',
+  last_login: '2026-10-17T08:00:00Z',
+};
 
 export const IS_DEMO_MODE = true;
 export const DEMO_DATA_NOTICE = 'DEMO DATA — For UI Layout & Evaluation Only';

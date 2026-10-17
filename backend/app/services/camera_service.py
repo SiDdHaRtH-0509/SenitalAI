@@ -1,6 +1,6 @@
 """Service for Camera edge device registry."""
 
-from typing import List
+from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.models.camera import CameraModel
 from app.schemas.camera import CameraCreate
@@ -98,3 +98,9 @@ def seed_default_cameras(db: Session) -> None:
         for cam_data in DEFAULT_CONFIGURED_CAMERAS:
             db.add(CameraModel(**cam_data))
         db.commit()
+
+
+def get_camera_by_id(db: Session, camera_id: str) -> Optional[CameraModel]:
+    """Retrieve a single camera record by unique hardware identifier."""
+    return db.query(CameraModel).filter(CameraModel.camera_id == camera_id).first()
+

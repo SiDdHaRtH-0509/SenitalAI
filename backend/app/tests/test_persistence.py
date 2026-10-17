@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.config import settings
+from app.core.security import ROLE_ADMIN, create_access_token
 from app.database import Base, get_db
 from app.main import app
 
@@ -41,7 +43,9 @@ def test_database_persistence_across_restarts():
 
         app.dependency_overrides[get_db] = override_get_db1
 
+        admin_token = create_access_token(subject="admin", role=ROLE_ADMIN)
         with TestClient(app) as client1:
+            client1.headers["Authorization"] = f"Bearer {admin_token}"
             # 1. Post event
             post_res = client1.post(
                 "/api/events",
@@ -84,6 +88,7 @@ def test_database_persistence_across_restarts():
         app.dependency_overrides[get_db] = override_get_db2
 
         with TestClient(app) as client2:
+            client2.headers["Authorization"] = f"Bearer {admin_token}"
             # Verify event survived restart
             get_res = client2.get(f"/api/events/{event_id}")
             assert get_res.status_code == 200

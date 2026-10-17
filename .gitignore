@@ -23,7 +23,12 @@ dist/
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
 *.log
+
+# Scratch directory
+scratch/
 
 # Local model weights and large/private video
 *.pt

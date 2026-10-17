@@ -131,6 +131,21 @@ export interface DashboardStatistics {
   is_mock: boolean;
 }
 
+export interface CameraWorkerStatus {
+  camera_id: string;
+  is_running: boolean;
+  connection_state: string; // 'CONNECTED' | 'CONNECTING' | 'RECONNECTING' | 'STOPPED' | 'FAILED' | 'ERROR'
+  fps: number;
+  latency_ms: number;
+  frames_processed: number;
+  events_emitted: number;
+  reconnect_count: number;
+  last_frame_timestamp?: string | null;
+  error_message?: string | null;
+  stream_uri_redacted?: string | null;
+  is_demo?: boolean;
+}
+
 export interface CameraInfo {
   camera_id: string;
   name: string;
@@ -142,6 +157,7 @@ export interface CameraInfo {
   stream_uri?: string;
   last_ping?: string;
   is_demo?: boolean;
+  worker_status?: CameraWorkerStatus;
 }
 
 export interface RestrictedZoneInfo {
@@ -173,3 +189,22 @@ export type NavigationPage =
   | 'analytics'
   | 'health'
   | 'settings';
+
+export type UserRole = 'ADMIN' | 'OPERATOR' | 'SERVICE';
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  email?: string | null;
+  full_name?: string | null;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  last_login?: string | null;
+}
+
+export interface AuthState {
+  isAuthenticated: boolean;
+  user: UserProfile | null;
+  token: string | null;
+}
