@@ -13,14 +13,14 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [ ] Verify submission claims and package final deliverables.
 
 ## Lead 1 — Frontend
-- [ ] Read project context and API contract.
-- [ ] Create React/Vite dashboard shell.
-- [ ] Add centralized API client and typed event models.
-- [ ] Display video/replay panel and explicit status label.
-- [ ] Display event timeline, risk score, reasons and recommendation.
-- [ ] Add loading, empty, stale, disconnected and error states.
-- [ ] Add acknowledgement only if backend endpoint is agreed and implemented.
-- [ ] Test with real API and document setup.
+- [x] Read project context and API contract.
+- [x] Create React/Vite dashboard shell.
+- [x] Add centralized API client and typed event models.
+- [x] Display video/replay panel and explicit status label.
+- [x] Display event timeline, risk score, reasons and recommendation.
+- [x] Add loading, empty, stale, disconnected and error states.
+- [ ] Add acknowledgement only if backend endpoint is agreed and implemented (simulated locally; backend PATCH pending).
+- [ ] Test with real API and document setup (API documented and offline fallback verified; live API pending backend deployment).
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
