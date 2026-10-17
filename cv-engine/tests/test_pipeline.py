@@ -188,18 +188,86 @@ class TestCVPipeline(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             next(self.pipeline.process_stream())
 
-    def test_pipeline_from_config_factory(self) -> None:
-        """Verify CVPipeline.from_config factory creates and initializes components."""
+    # --- Phase 3 Specific Tests ---
+
+    def test_pipeline_from_config_with_zone_configuration(self) -> None:
+        """Verify CVPipeline.from_config factory creates and configures ZoneAnalyzer."""
         cfg = CVConfig(
             video_source="sample-data/demo.mp4",
             camera_id="cam-factory",
             model_type="mock",
+            zone_id="perimeter_alpha",
+            zone_vertices=[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
         )
         pipeline = CVPipeline.from_config(config=cfg, auto_init=True)
         self.assertTrue(pipeline.is_initialized)
         self.assertIsNotNone(pipeline.video_source)
         self.assertIsNotNone(pipeline.detector)
+        self.assertIsNotNone(pipeline.zone_analyzer)
+        self.assertEqual(len(pipeline.zone_analyzer.zones), 1)
+        self.assertEqual(pipeline.zone_analyzer.zones[0].zone_id, "perimeter_alpha")
+
+    def test_process_frame_with_zone_analyzer(self) -> None:
+        """Verify process_frame executes zone analysis on detected persons."""
+        from sentinel_cv.zone import PolygonZone, ZoneAnalyzer
+
+        # Zone covering (0,0) to (100,100)
+        zone = PolygonZone(
+            zone_id="gate_north",
+            name="North Gate Buffer",
+            vertices=[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
+        )
+        analyzer = ZoneAnalyzer(zones=[zone], reference_point_strategy="bottom_center")
+
+        # Mock detector returns person with bottom center at (30.0, 100.0) -> inside zone
+        mock_detector = MockDetector(ready=True)
+        pipeline = CVPipeline(
+            config=self.config,
+            detector=mock_detector,
+            zone_analyzer=analyzer,
+        )
+        pipeline.initialize()
+
+        result = pipeline.process_frame(frame="frame_data", metadata=self.sample_metadata)
+        self.assertTrue(result.processed)
+        self.assertEqual(len(result.detections), 1)
+        self.assertEqual(len(result.zone_results), 1)
+
+        zone_res = result.zone_results[0]
+        self.assertEqual(zone_res.zone_id, "gate_north")
+        self.assertTrue(zone_res.is_inside)
+        self.assertEqual(zone_res.reference_point, (30.0, 100.0))
+        self.assertEqual(len(result.inside_zone_results), 1)
+
+    def test_run_with_detector_and_zone_analyzer(self) -> None:
+        """Verify end-to-end pipeline run with video source, detector, and zone analyzer."""
+        from sentinel_cv.zone import PolygonZone, ZoneAnalyzer
+
+        zone = PolygonZone(
+            zone_id="restricted_fence",
+            name="Outer Fence Line",
+            vertices=[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
+        )
+        analyzer = ZoneAnalyzer(zones=[zone])
+        mock_source = MockVideoSource(max_frames=3)
+        mock_detector = MockDetector(ready=True)
+
+        pipeline = CVPipeline(
+            config=self.config,
+            video_source=mock_source,
+            detector=mock_detector,
+            zone_analyzer=analyzer,
+        )
+        pipeline.initialize()
+
+        results = pipeline.run()
+        self.assertEqual(len(results), 3)
+        for res in results:
+            self.assertEqual(len(res.detections), 1)
+            self.assertEqual(len(res.inside_zone_results), 1)
+            self.assertTrue(res.inside_zone_results[0].is_inside)
 
 
 if __name__ == "__main__":
     unittest.main()
+
