@@ -27,8 +27,8 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [ ] Confirm sample video authorization and format.
 - [x] Test OpenCV and selected pretrained detector in available environment.
 - [x] Implement video reader and configured zone.
-- [ ] Implement documented zone-entry logic and temporal confirmation.
-- [ ] Add event ID, timestamp, cooldown and deduplication.
+- [x] Implement documented zone-entry logic and temporal confirmation.
+- [x] Add event ID, timestamp, cooldown and deduplication.
 - [ ] Send exact payload to backend.
 - [ ] Test failure/replay fallback and document limitations.
 

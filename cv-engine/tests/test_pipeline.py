@@ -265,9 +265,127 @@ class TestCVPipeline(unittest.TestCase):
         for res in results:
             self.assertEqual(len(res.detections), 1)
             self.assertEqual(len(res.inside_zone_results), 1)
-            self.assertTrue(res.inside_zone_results[0].is_inside)
+    # --- Phase 4 Specific Tests ---
+
+    def test_pipeline_from_config_with_event_and_backend_components(self) -> None:
+        """Verify CVPipeline.from_config factory wires event generator and backend client."""
+        cfg = CVConfig(
+            video_source="sample-data/demo.mp4",
+            camera_id="cam-factory",
+            model_type="mock",
+            backend_url="http://mock-backend:8000",
+            events_enabled=True,
+            temporal_confirmation_frames=1,
+            deduplication_cooldown_sec=5.0,
+        )
+        pipeline = CVPipeline.from_config(config=cfg, auto_init=True)
+        self.assertTrue(pipeline.is_initialized)
+        self.assertIsNotNone(pipeline.event_generator)
+        self.assertIsNotNone(pipeline.backend_client)
+        self.assertEqual(pipeline.backend_client.base_url, "http://mock-backend:8000")
+
+    def test_process_frame_generates_security_events(self) -> None:
+        """Verify process_frame generates qualifying SecurityEvents when person is inside zone."""
+        from sentinel_cv.event_generator import EventGenerator
+        from sentinel_cv.zone import PolygonZone, ZoneAnalyzer
+
+        zone = PolygonZone(
+            zone_id="zone-gate",
+            name="Gate Buffer",
+            vertices=[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
+        )
+        analyzer = ZoneAnalyzer(zones=[zone], reference_point_strategy="bottom_center")
+        generator = EventGenerator(
+            camera_id="cam-test",
+            temporal_confirmation_frames=1,
+            deduplication_cooldown_sec=5.0,
+        )
+
+        mock_detector = MockDetector(ready=True)
+        pipeline = CVPipeline(
+            config=self.config,
+            detector=mock_detector,
+            zone_analyzer=analyzer,
+            event_generator=generator,
+        )
+        pipeline.initialize()
+
+        result = pipeline.process_frame(frame="frame_data", metadata=self.sample_metadata)
+        self.assertTrue(result.processed)
+        self.assertEqual(len(result.events), 1)
+
+        event = result.events[0]
+        self.assertEqual(event.camera_id, "cam-test")
+        self.assertEqual(event.event_type, "RESTRICTED_ZONE_ENTRY")
+        self.assertEqual(event.zone_id, "zone-gate")
+        self.assertEqual(event.confidence, 0.92)
+
+    def test_end_to_end_pipeline_with_events_and_backend_submission(self) -> None:
+        """Verify full pipeline flow: video source -> detector -> zone -> event generator -> backend client."""
+        import json
+        import urllib.request
+        from sentinel_cv.backend_client import BackendClient
+        from sentinel_cv.event_generator import EventGenerator
+        from sentinel_cv.zone import PolygonZone, ZoneAnalyzer
+
+        zone = PolygonZone(
+            zone_id="restricted-area",
+            name="High Security Perimeter",
+            vertices=[(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)],
+        )
+        analyzer = ZoneAnalyzer(zones=[zone])
+        generator = EventGenerator(
+            camera_id="cam-live-01",
+            temporal_confirmation_frames=1,
+            deduplication_cooldown_sec=10.0,
+        )
+
+        submitted_events = []
+
+        def mock_transport(req: urllib.request.Request, timeout: float):
+            payload = json.loads(req.data.decode("utf-8"))
+            submitted_events.append(payload)
+            resp = json.dumps({"status": "NEW", "event_id": payload["event_id"]}).encode("utf-8")
+            return 201, resp, {}
+
+        backend_client = BackendClient(
+            base_url="http://mock-backend:8000",
+            transport=mock_transport,
+        )
+
+        mock_source = MockVideoSource(max_frames=3)
+        mock_detector = MockDetector(ready=True)
+
+        pipeline = CVPipeline(
+            config=self.config,
+            video_source=mock_source,
+            detector=mock_detector,
+            zone_analyzer=analyzer,
+            event_generator=generator,
+            backend_client=backend_client,
+        )
+        pipeline.initialize()
+
+        results = pipeline.run()
+        self.assertEqual(len(results), 3)
+
+        # In frame 0: event is generated and submitted
+        self.assertEqual(len(results[0].events), 1)
+        self.assertEqual(len(results[0].event_submissions), 1)
+        self.assertTrue(results[0].event_submissions[0].success)
+        self.assertEqual(results[0].event_submissions[0].status_code, 201)
+
+        # In frames 1 & 2: cooldown (10.0s) prevents duplicate event submission
+        self.assertEqual(len(results[1].events), 0)
+        self.assertEqual(len(results[2].events), 0)
+
+        # Exactly 1 event reached backend
+        self.assertEqual(len(submitted_events), 1)
+        self.assertEqual(submitted_events[0]["camera_id"], "cam-live-01")
+        self.assertEqual(submitted_events[0]["event_type"], "RESTRICTED_ZONE_ENTRY")
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

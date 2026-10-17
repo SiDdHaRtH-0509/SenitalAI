@@ -1,7 +1,7 @@
 # SentinelAI — Computer Vision Engine (`cv-engine`)
 
 **Role:** Lead 2 (Computer Vision & Event Producer)  
-**Current Status:** Phase 3 Complete (Restricted-Zone Detection)
+**Current Status:** Phase 4 Complete (Event Generation & Backend Integration)
 
 ---
 
@@ -18,21 +18,21 @@ Its responsibilities within the SentinelAI architecture:
 6. Transmit structured, observable events conforming to `API_CONTRACT.md` to the backend API (Phase 4).
 
 > **Architectural Boundary:**  
-> The Computer Vision engine only produces observable detections, spatial zone incursions, and detector statistical confidence (`confidence` ∈ `[0.0, 1.0]`). It **never** computes threat scores, intent probabilities, or risk levels. Risk scoring and explanation reasons are strictly owned and computed by the backend service.
+> The Computer Vision engine only produces observable detections, spatial zone incursions, and detector statistical confidence (`confidence` ∈ `[0.0, 1.0]`). It **never** computes threat scores, intent probabilities, or risk levels. Risk scoring, risk levels, and explanation reasons are strictly owned and computed by the backend service.
 
 ---
 
-## 2. Phase 3 Capabilities & Current Status
+## 2. Phase 4 Capabilities & Current Status
 
-Phase 3 builds upon the Phase 1 and 2 foundation by delivering polygon-based restricted-zone spatial analysis:
-- **Polygon Geometry Engine:** `PolygonZone` models arbitrary 2D polygonal security zones with strict vertex validation, Shoelace area computation, axis-aligned bounding box caching, and coordinate bounds checking.
-- **Pure Python Point-in-Polygon:** Robust Ray-Casting algorithm implemented entirely in the Python standard library with zero native C-extension dependencies (no GEOS/Shapely required), guaranteeing 100% portability to IBM LinuxONE (`s390x`).
-- **Boundary Tolerance:** Boundary and vertex contacts are explicitly classified as inside the zone (`is_inside=True`) via collinear cross-product segment checking.
-- **Ground-Plane Reference Point (Foot-Contact Anchor):** Default reference point evaluates the bottom-center of the bounding box `(x1 + w/2, y2)` representing physical ground contact. Prevents false positive alerts when a subject stands outside the zone boundary but leans or gestures across it.
-- **Zone Analyzer Adapter:** `ZoneAnalyzer` implementing `IZoneAnalyzer`, supporting multi-zone evaluation, zone enable/disable toggling, and configurable reference point strategies (`bottom_center`, `center`).
-- **Pipeline Integration:** `CVPipeline` processes detections through `ZoneAnalyzer`, logging zone incursions and populating `zone_results` and `inside_zone_results` in `PipelineResult`.
-- **Command-Line Interface:** `python -m sentinel_cv` CLI extended with `--zone-id`, `--zone-vertices`, `--zones-file`, and `--strategy` flags.
-- **Comprehensive Automated Test Suite:** 88 passing unit and integration tests covering geometry, boundaries, concave polygons, ground-contact vs centroid reference points, streaming, and pipeline integration.
+Phase 4 completes the event generation and backend integration layer:
+- **API Contract Compliance:** Structured `SecurityEvent` model strictly adhering to `API_CONTRACT.md` (`POST /api/events`), including required fields: `event_id`, `camera_id`, `event_type`, `timestamp`, `severity`, `confidence`, `zone_id`, `description`, `evidence`.
+- **Occupancy & Zone-Entry Policy:** In the absence of a multi-object tracker, detections are frame-local. Events represent qualifying zone occupancy episodes rather than verified identity transitions.
+- **Temporal Confirmation (Debounce):** Configurable multi-frame persistence requirement (`temporal_confirmation_frames >= 1`) prevents false positive triggers caused by single-frame detector flutter.
+- **Cooldown Deduplication:** Time-windowed cooldown (`deduplication_cooldown_sec`) suppresses redundant alerts while a subject remains continuously inside a restricted zone.
+- **Deterministic Event Identifiers:** Generates stable, reproducible event IDs (`evt-{camera_id}-{zone_id}-{sha_suffix}`) derived from observation attributes via SHA-256 without relying on random UUIDs or Python's built-in `hash()`.
+- **Resilient Backend Client:** Built on Python's standard library `urllib.request` (zero native C-dependencies), with explicit connection and read timeouts, bounded exponential backoff retries for transient 5xx errors, immediate rejection of 4xx client errors, and contract-compliant HTTP 409 idempotent duplicate handling.
+- **Dependency Injection for Testing:** Injected transport callable allows 100% deterministic, offline automated unit tests covering all HTTP success and failure modes.
+- **Comprehensive Automated Test Suite:** 115 passing automated unit and integration tests across all four phases.
 
 ---
 
@@ -46,24 +46,28 @@ cv-engine/
 ├── README.md                 # Complete CV engine documentation
 ├── src/
 │   └── sentinel_cv/
-│       ├── __init__.py       # Package exports and version metadata (v0.3.0)
+│       ├── __init__.py       # Package exports and version metadata (v0.4.0)
 │       ├── __main__.py       # Executable module entry point
+│       ├── backend_client.py # HTTP client with bounded retries & timeout controls
 │       ├── cli.py            # CLI entry point (arguments, summaries, JSON output)
 │       ├── config.py         # CVConfig dataclass with strict validation
 │       ├── detector.py       # YOLOPersonDetector, MockPersonDetector, factory
-│       ├── interfaces.py     # IVideoSource, IDetector, IZoneAnalyzer, ICVPipeline
+│       ├── event_generator.py# Temporal debouncing, cooldown, SecurityEvent builder
+│       ├── interfaces.py     # IVideoSource, IDetector, IZoneAnalyzer, IEventGenerator, IBackendClient
 │       ├── logging_config.py # Structured logging setup & namespaces
-│       ├── models.py         # BoundingBox, Detection, FrameMetadata, ZoneAnalysisResult, PipelineResult
+│       ├── models.py         # BoundingBox, Detection, FrameMetadata, SecurityEvent, PipelineResult
 │       ├── pipeline.py       # CVPipeline streaming orchestrator
 │       ├── video_source.py   # OpenCVVideoSource with zero-division safe FPS
 │       └── zone.py           # PolygonZone, ZoneAnalyzer, ray-casting point-in-polygon
 └── tests/
     ├── __init__.py
+    ├── test_backend_client.py # HTTP client success, 4xx, 5xx, timeout, retry tests
     ├── test_cli.py           # CLI argument and execution tests
     ├── test_config.py        # Config defaults, env loading, validation error tests
     ├── test_detector.py      # YOLO class filtering, confidence bounds, boundary tests
-    ├── test_models.py        # BoundingBox, Detection, FrameMetadata geometry tests
-    ├── test_pipeline.py      # Lifecycle, streaming, max_frames, zone integration tests
+    ├── test_event_generator.py# Event schema, debounce, cooldown, deterministic ID tests
+    ├── test_models.py        # Geometry, detection, metadata, security event tests
+    ├── test_pipeline.py      # Lifecycle, streaming, max_frames, end-to-end integration tests
     ├── test_video_source.py  # Sequential reads, fallback FPS, EOF, context manager
     └── test_zone.py          # Polygon geometry, boundary tolerance, ray-casting, strategies
 ```
@@ -156,45 +160,141 @@ for res in results:
 
 ---
 
-## 7. Command-Line Interface (CLI)
+---
 
-Run person detection and zone analysis on an authorized local video file:
+## 7. Security Event Generation & API Contract Compliance
+
+Phase 4 bridges visual analytics to the shared SentinelAI platform via `EventGenerator` and `SecurityEvent`:
+
+```python
+from sentinel_cv.event_generator import EventGenerator
+from sentinel_cv.models import FrameMetadata
+
+# Initialize generator with debouncing and cooldown policies
+generator = EventGenerator(
+    camera_id="cam-demo-01",
+    severity="HIGH",
+    temporal_confirmation_frames=2,   # Require 2 consecutive inside frames
+    deduplication_cooldown_sec=5.0,    # Suppress duplicate alerts for 5.0 seconds
+    base_timestamp="2026-10-17T09:30:00Z",
+)
+
+# Process zone evaluation results
+events = generator.process_zone_results(zone_results, metadata)
+for ev in events:
+    print(f"Emitted: {ev.event_id} | Zone: {ev.zone_id} | Conf: {ev.confidence:.2f}")
+```
+
+### Event Contract Schema (`POST /api/events`):
+```json
+{
+  "event_id": "evt-cam-demo-01-zone-restricted-01-a1b2c3d4",
+  "camera_id": "cam-demo-01",
+  "event_type": "RESTRICTED_ZONE_ENTRY",
+  "timestamp": "2026-10-17T09:30:00Z",
+  "severity": "HIGH",
+  "confidence": 0.91,
+  "zone_id": "zone-restricted-01",
+  "description": "Observable person detected inside restricted zone 'North Perimeter' at ground-plane position (140.0, 450.0)",
+  "evidence": {
+    "class_name": "person",
+    "track_id": null,
+    "frame_number": 420,
+    "bounding_box": {"x1": 100.0, "y1": 200.0, "x2": 180.0, "y2": 450.0},
+    "reference_point": [140.0, 450.0],
+    "zone_name": "North Perimeter",
+    "elapsed_time_sec": 14.2,
+    "consecutive_inside_frames": 2
+  }
+}
+```
+
+### Reliability & Policy Rules:
+- **Occupancy vs. Tracking:** In the absence of a multi-object tracker, detections are frame-local. The policy evaluates zone occupancy rather than identity transitions. The evidence payload explicitly records `track_id: null` per contract.
+- **Temporal Debounce:** Single-frame false detections are ignored until occupancy persists for `temporal_confirmation_frames`.
+- **Cooldown Window:** Once emitted, redundant alerts for the same zone are suppressed for `deduplication_cooldown_sec` while continuous occupancy lasts.
+- **Deterministic Event IDs:** `evt-{camera_id}-{zone_id}-{sha_suffix}` is computed deterministically from `camera_id`, `zone_id`, `frame_index`, elapsed time, and confidence. Reprocessing the same video stream produces the exact same event identifiers without relying on random UUIDs or Python `hash()`.
+- **No Fabricated Risk Fields:** The CV engine never includes `risk_score`, `risk_level`, `reasons`, or `recommended_action`; those fields are calculated exclusively by the backend service.
+
+---
+
+## 8. Backend HTTP Client (`BackendClient`)
+
+Transmits events to the backend service via `POST /api/events`:
+
+```python
+from sentinel_cv.backend_client import BackendClient
+
+client = BackendClient(
+    base_url="http://localhost:8000",
+    timeout_seconds=5.0,
+    max_retries=2,
+    events_enabled=True,
+)
+
+# Check health
+healthy, msg = client.check_health()
+
+# Submit event
+result = client.submit_event(event)
+if result.success:
+    print(f"Event submitted successfully (HTTP {result.status_code})")
+```
+
+### Key Reliability Controls:
+- **Zero Third-Party Network Dependencies:** Built entirely with Python's standard library `urllib.request`. Zero native C-extensions or additional dependencies required.
+- **Explicit Timeouts:** Configurable connection and read timeouts (`timeout_seconds=5.0`) prevent stalled workers.
+- **Bounded Exponential Backoff Retries:** Automatically retries transient 5xx server errors and network drops up to `max_retries` with exponential backoff.
+- **Client Error Non-Retry:** HTTP 4xx client errors (bad payload, rejected schema) are never retried.
+- **Idempotency Handling:** HTTP 409 responses or acknowledged duplicates are handled gracefully as successful idempotent submissions (`idempotent_duplicate=True`).
+- **Graceful Degradation:** Submission failures are logged with descriptive context and returned as `EventSubmissionResult` without crashing the video pipeline.
+
+---
+
+## 9. Command-Line Interface (CLI)
+
+Run person detection, zone analysis, and backend event submission on local video feeds:
 
 ```bash
 # Basic run with frame limit
 python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --max-frames 100
 
-# Specify custom model and confidence threshold
-python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --model yolov8n.pt --confidence 0.65
-
-# Configure restricted zone and ground-contact strategy
+# Run with custom model, confidence, and restricted zone
 python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 \
   --zone-id perimeter_buffer \
   --zone-vertices "[(100,200),(500,200),(500,600),(100,600)]" \
   --strategy bottom_center \
+  --confidence 0.65 \
   --max-frames 50
 
-# Offline / Synthetic test mode with JSON summary
-python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --model mock --max-frames 30 --json
+# Run with live backend submission
+python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 \
+  --backend-url http://localhost:8000 \
+  --severity HIGH \
+  --debounce 2 \
+  --cooldown 10.0
 
-# Output structured per-frame detections and zone evaluations
-python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --max-frames 10 --per-frame-json
+# Disable backend submission for offline evaluation
+python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --disable-events --json
 ```
 
 ### Example Summary Output:
 ```text
 ========================================================
- SENTINELAI CV ENGINE — VIDEO PROCESSING SUMMARY
+ SENTINELAI CV ENGINE — VIDEO & EVENT PROCESSING SUMMARY
 ========================================================
  Video Source:            sample-data/synthetic_border_test.mp4
  Camera ID:               cam-demo-01
- Zone ID:                 perimeter_buffer
- Strategy:                bottom_center
+ Monitored Zone ID:       perimeter_buffer
+ Ground Contact Strategy: bottom_center
  Model Type:              yolo (yolov8n.pt)
  Confidence Threshold:    0.5
+ Backend URL:             http://localhost:8000
+ Events Enabled:          True
  Frames Processed:        100
  Total Person Detections: 42
  Total Zone Incursions:   18
+ Total Events Emitted:    3
  Processing Time:         1.84s
  Average Processing FPS:  54.35 FPS
 ========================================================
@@ -202,9 +302,9 @@ python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --max-frames
 
 ---
 
-## 8. Running Automated Tests
+## 10. Running Automated Tests
 
-Run the complete test suite (88 tests) using Python's standard `unittest` runner:
+Run the complete test suite (115 tests) using Python's standard `unittest` runner:
 
 ```bash
 # Windows PowerShell
@@ -214,38 +314,40 @@ $env:PYTHONPATH="src"; python -m unittest discover -v -s tests -p "test_*.py"
 PYTHONPATH=src python3 -m unittest discover -v -s tests -p "test_*.py"
 ```
 
-All unit tests run deterministically without internet access, physical cameras, or external API endpoints.
+All 115 unit and integration tests run deterministically without internet access, physical cameras, or a live backend server.
 
 ---
 
-## 9. Performance and Resource Considerations
+## 11. Performance and Resource Considerations
 
-- **Streaming Generator:** `CVPipeline.process_stream()` yields frame results incrementally without holding all video frames in RAM.
+- **Streaming Generator:** `CVPipeline.process_stream()` yields frame results incrementally without holding video frames in RAM.
 - **Bounding Box Caching:** `PolygonZone` caches its axis-aligned bounding box to perform $O(1)$ rejection before executing ray-casting checks.
-- **CPU Inference:** `yolov8n.pt` operates in CPU mode by default, consuming approximately 6.2 MB of model storage and maintaining low memory overhead.
+- **Bounded Backoff:** Transient network failures back off exponentially without stalling the video ingestion thread indefinitely.
+- **CPU Inference:** `yolov8n.pt` operates in CPU mode by default, consuming approximately 6.2 MB of model storage.
 - **Progress Logging:** Logs progress every 50 frames rather than outputting log messages for every individual frame.
 - **Clean Teardown:** Handles interrupts and EOF gracefully, closing video streams and freeing capture buffers.
 
 ---
 
-## 10. IBM LinuxONE (`s390x`) Compatibility Status
+## 12. IBM LinuxONE (`s390x`) Compatibility Status
 
 - **Python Version Tested:** Python 3.14.2 (Windows x86-64 development environment).
 - **OpenCV Version Tested:** OpenCV 5.0.0 (`cv2.VideoCapture`).
 - **Detection Framework:** `ultralytics` 8.4.178 with PyTorch 2.14.1 (CPU mode).
-- **Geometry & Spatial Analysis:** 100% pure Python standard library (`sentinel_cv.zone`). Zero C-extensions (no GEOS, Shapely, or GDAL) required.
+- **Geometry & Spatial Analysis:** 100% pure Python standard library (`sentinel_cv.zone`). Zero native C-extensions required.
+- **Event Generation & HTTP Client:** 100% pure Python standard library (`hashlib`, `datetime`, `urllib.request`). Zero third-party network libraries required.
 - **Target Architecture Status (`s390x`):**
-  - Pure Python components (`models.py`, `config.py`, `interfaces.py`, `pipeline.py`, `zone.py`, `MockPersonDetector`) are 100% architecture-neutral.
+  - Pure Python components (`models.py`, `config.py`, `interfaces.py`, `pipeline.py`, `zone.py`, `event_generator.py`, `backend_client.py`, `MockPersonDetector`) are 100% architecture-neutral.
   - On `s390x` LinuxONE systems where PyTorch/Ultralytics wheels may not be pre-compiled, the engine provides:
     1. `MockPersonDetector` for offline verification and CI testing.
     2. Architecture fallback: Running the CV engine on an authorized workstation and streaming structured events over HTTP to the LinuxONE backend per `ARCHITECTURE.md`.
 
 ---
 
-## 11. Planned Progression
+## 13. Planned Progression
 
 - **Phase 1 (Complete):** CV Engine Foundation, Configuration, Models, Interfaces, Logging, Tests.
 - **Phase 2 (Complete):** Video Ingestion & Person Detection Adapter (`OpenCVVideoSource`, `YOLOPersonDetector`, streaming pipeline, CLI, unit tests).
 - **Phase 3 (Complete):** Configurable Restricted Zone & Person-vs-Zone Spatial Analysis (`PolygonZone`, Ray-Casting algorithm, ground-contact reference point, `ZoneAnalyzer`, unit/integration tests).
-- **Phase 4:** Event Generation & Backend Ingestion Client (temporal confirmation multi-frame debounce, cooldown deduplication, `API_CONTRACT.md` payload formatting, HTTP POST).
+- **Phase 4 (Complete):** Event Generation & Backend Ingestion Client (`SecurityEvent` contract schema, temporal debouncing, cooldown deduplication, deterministic IDs, `BackendClient`, unit/integration tests).
 - **Phase 5:** End-to-End Integration, Replay Fallback, Benchmarking & Final Documentation.

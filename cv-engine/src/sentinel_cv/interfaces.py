@@ -8,7 +8,14 @@ implementations of these interfaces (e.g. OpenCV video reader, ONNX/YOLO detecto
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional, Tuple
 
-from sentinel_cv.models import Detection, FrameMetadata, PipelineResult
+from sentinel_cv.models import (
+    Detection,
+    EventSubmissionResult,
+    FrameMetadata,
+    PipelineResult,
+    SecurityEvent,
+    ZoneAnalysisResult,
+)
 
 
 class IVideoSource(ABC):
@@ -81,6 +88,59 @@ class IZoneAnalyzer(ABC):
 
         Returns:
             List of detected zone-entry events or candidates.
+        """
+        pass
+
+
+class IEventGenerator(ABC):
+    """Interface for generating structured security events from zone analysis observations."""
+
+    @abstractmethod
+    def process_zone_results(
+        self,
+        zone_results: List[ZoneAnalysisResult],
+        metadata: FrameMetadata,
+    ) -> List[SecurityEvent]:
+        """Evaluate zone results and generate structured events conforming to API_CONTRACT.md.
+
+        Applies temporal confirmation debouncing and cooldown deduplication policies.
+
+        Args:
+            zone_results: Results of spatial evaluation for current frame.
+            metadata: Associated frame sequence and timing metadata.
+
+        Returns:
+            List[SecurityEvent]: Structured security events qualifying for emission.
+        """
+        pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        """Reset internal temporal debounce and cooldown state."""
+        pass
+
+
+class IBackendClient(ABC):
+    """Interface for submitting events to the shared SentinelAI backend service."""
+
+    @abstractmethod
+    def check_health(self) -> Tuple[bool, str]:
+        """Check backend service connectivity via GET /api/health.
+
+        Returns:
+            Tuple[bool, str]: (is_healthy, status_message)
+        """
+        pass
+
+    @abstractmethod
+    def submit_event(self, event: SecurityEvent) -> EventSubmissionResult:
+        """Submit a single SecurityEvent to POST /api/events.
+
+        Args:
+            event: Structured SecurityEvent.
+
+        Returns:
+            EventSubmissionResult: Outcome of submission (success, status_code, response/error).
         """
         pass
 
