@@ -1,0 +1,40 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Databases/logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Local model weights and large/private video
+*.pt
+*.pth
+*.onnx
+sample-data/*.mp4
+sample-data/*.avi
+sample-data/*.mov
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

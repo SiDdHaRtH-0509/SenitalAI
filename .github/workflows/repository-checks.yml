@@ -1,0 +1,30 @@
+name: Repository checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  structure-and-secret-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required project contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in README.md PROJECT_CONTEXT.md ARCHITECTURE.md API_CONTRACT.md TEAM_ROLES.md TASK_BOARD.md; do
+            test -s "$file" || { echo "Missing or empty required file: $file"; exit 1; }
+          done
+      - name: Reject committed real environment file
+        shell: bash
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo 'A real .env file must not be committed.'
+            exit 1
+          fi
