@@ -24,7 +24,7 @@ Work in order. Check boxes only after the criterion is met.
 - [ ] Capture screenshot of the actual working dashboard.
 
 ## Tertiary / optional (only after MVP)
-- [ ] Add a small risk trend chart based on real stored events.
+- [x] Add a small risk trend chart based on real stored events (Implemented in AnalyticsPage).
 - [ ] Add WebSockets only if polling is stable and there is spare time.
 
 ## Completion criteria

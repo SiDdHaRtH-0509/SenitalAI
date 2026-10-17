@@ -26,18 +26,18 @@ interface NavItemDef {
   id: NavigationPage;
   label: string;
   icon: LucideIcon;
-  isImplemented: boolean;
+  badge?: string;
 }
 
 const NAV_ITEMS: NavItemDef[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard, isImplemented: true },
-  { id: 'monitoring', label: 'Live Monitoring', icon: Video, isImplemented: false },
-  { id: 'events', label: 'Security Events', icon: AlertTriangle, isImplemented: false },
-  { id: 'cameras', label: 'Cameras', icon: Camera, isImplemented: false },
-  { id: 'zones', label: 'Restricted Zones', icon: MapPin, isImplemented: false },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, isImplemented: false },
-  { id: 'health', label: 'System Health', icon: Activity, isImplemented: false },
-  { id: 'settings', label: 'Settings', icon: Settings, isImplemented: false },
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'monitoring', label: 'Live Monitoring', icon: Video },
+  { id: 'events', label: 'Security Events', icon: AlertTriangle },
+  { id: 'cameras', label: 'Cameras', icon: Camera },
+  { id: 'zones', label: 'Restricted Zones', icon: MapPin },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'health', label: 'System Health', icon: Activity },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Items */}
         <nav className="sidebar-nav">
-          <div className="nav-section-label">Operations</div>
+          <div className="nav-section-label">Operations Center</div>
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
@@ -97,8 +97,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Icon size={16} />
                   <span>{item.label}</span>
                 </div>
-                {!item.isImplemented && (
-                  <span className="nav-badge-pending">Phase 2+</span>
+                {item.badge && (
+                  <span className="nav-badge-pending">{item.badge}</span>
                 )}
               </button>
             );
@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-text-secondary)' }}>
               <Server size={11} />
-              <span style={{ fontSize: '11px', fontWeight: 500 }}>Datathon Prototype v1.0</span>
+              <span style={{ fontSize: '11px', fontWeight: 500 }}>Phase 2 Complete</span>
             </div>
             <div className="node-location">Sector Alpha • Command Center</div>
           </div>

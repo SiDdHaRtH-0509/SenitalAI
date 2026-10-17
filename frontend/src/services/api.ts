@@ -8,10 +8,25 @@
  * labelled demonstration fixtures without crashing the user interface.
  */
 
-import { SecurityEvent, DashboardStatistics, SystemHealthState } from '../types';
-import { DEMO_EVENTS, DEMO_STATISTICS, INITIAL_SYSTEM_HEALTH } from '../data/demoData';
+import {
+  SecurityEvent,
+  DashboardStatistics,
+  SystemHealthState,
+  CameraInfo,
+  RestrictedZoneInfo,
+  ClientSettings,
+} from '../types';
+import {
+  DEMO_EVENTS,
+  DEMO_STATISTICS,
+  INITIAL_SYSTEM_HEALTH,
+  DEMO_CAMERAS,
+  DEMO_ZONES,
+  DEFAULT_CLIENT_SETTINGS,
+} from '../data/demoData';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const SETTINGS_STORAGE_KEY = 'sentinel_client_settings_v1';
 
 export interface ApiResponse<T> {
   data: T;
@@ -22,7 +37,8 @@ export interface ApiResponse<T> {
 /**
  * Checks connectivity to the backend health endpoint (GET /api/health).
  */
-export async function checkBackendHealth(): Promise<{ isConnected: boolean; message: string }> {
+export async function checkBackendHealth(): Promise<{ isConnected: boolean; message: string; latencyMs: number | null }> {
+  const startTime = performance.now();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -32,23 +48,27 @@ export async function checkBackendHealth(): Promise<{ isConnected: boolean; mess
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+    const latencyMs = Math.round(performance.now() - startTime);
 
     if (res.ok) {
       const data = await res.json();
       return {
         isConnected: data.status === 'ok',
         message: data.status === 'ok' ? 'Backend operational' : 'Backend degraded',
+        latencyMs,
       };
     }
     return {
       isConnected: false,
       message: `Backend returned status ${res.status}`,
+      latencyMs: null,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Connection failed';
     return {
       isConnected: false,
       message: `Backend unreachable (${errorMsg})`,
+      latencyMs: null,
     };
   }
 }
@@ -82,7 +102,7 @@ export async function fetchRecentEvents(): Promise<ApiResponse<SecurityEvent[]>>
       error: `Backend error: HTTP ${res.status}. Showing demonstration fixtures.`,
     };
   } catch {
-    // Expected in Phase 1 before backend service is launched
+    // Expected before backend service is launched
     return {
       data: DEMO_EVENTS,
       isLive: false,
@@ -112,7 +132,7 @@ export async function fetchDashboardStats(): Promise<ApiResponse<DashboardStatis
       return {
         data: {
           active_cameras: stats.active_cameras ?? 0,
-          total_cameras: stats.total_cameras ?? 4,
+          total_cameras: stats.total_cameras ?? DEMO_CAMERAS.length,
           events_today: stats.total_events ?? 0,
           restricted_zone_alerts: stats.by_risk_level?.HIGH ?? 0,
           critical_alerts: stats.by_risk_level?.CRITICAL ?? 0,
@@ -136,6 +156,56 @@ export async function fetchDashboardStats(): Promise<ApiResponse<DashboardStatis
 }
 
 /**
+ * Fetches camera inventory.
+ */
+export async function fetchCameras(): Promise<ApiResponse<CameraInfo[]>> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+    const res = await fetch(`${API_BASE_URL}/api/cameras`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data: CameraInfo[] = await res.json();
+      return { data, isLive: true };
+    }
+    return { data: DEMO_CAMERAS, isLive: false, error: 'Cameras endpoint not found. Using demo inventory.' };
+  } catch {
+    return { data: DEMO_CAMERAS, isLive: false };
+  }
+}
+
+/**
+ * Fetches restricted zone boundaries.
+ */
+export async function fetchRestrictedZones(): Promise<ApiResponse<RestrictedZoneInfo[]>> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+    const res = await fetch(`${API_BASE_URL}/api/zones`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data: RestrictedZoneInfo[] = await res.json();
+      return { data, isLive: true };
+    }
+    return { data: DEMO_ZONES, isLive: false, error: 'Zones endpoint not found. Using demo boundaries.' };
+  } catch {
+    return { data: DEMO_ZONES, isLive: false };
+  }
+}
+
+/**
  * Retrieves the current health state across platform subsystems.
  */
 export async function fetchSystemHealth(): Promise<SystemHealthState> {
@@ -151,12 +221,19 @@ export async function fetchSystemHealth(): Promise<SystemHealthState> {
         ? 'FastAPI service connected and responding on localhost:8000'
         : 'API service at http://localhost:8000/api/health is offline.',
       lastChecked: new Date().toLocaleTimeString(),
+      latencyMs: backendCheck.latencyMs,
     },
     database: {
       ...INITIAL_SYSTEM_HEALTH.database,
       status: backendCheck.isConnected ? 'OPERATIONAL' : 'DISCONNECTED',
       label: backendCheck.isConnected ? 'Operational' : 'Not Connected',
       lastChecked: new Date().toLocaleTimeString(),
+      latencyMs: backendCheck.isConnected ? 2 : null,
+    },
+    dashboard: {
+      ...INITIAL_SYSTEM_HEALTH.dashboard,
+      lastChecked: new Date().toLocaleTimeString(),
+      latencyMs: 1,
     },
   };
 }
@@ -184,5 +261,28 @@ export async function updateEventStatus(
       success: false,
       message: 'Backend is offline; status update cannot be persisted to database.',
     };
+  }
+}
+
+/**
+ * Local Settings Management
+ */
+export function loadClientSettings(): ClientSettings {
+  try {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+      return { ...DEFAULT_CLIENT_SETTINGS, ...JSON.parse(stored) };
+    }
+  } catch {
+    // Fall back to defaults if localStorage is disabled
+  }
+  return DEFAULT_CLIENT_SETTINGS;
+}
+
+export function saveClientSettings(settings: ClientSettings): void {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Silently handle storage quota/permission issues
   }
 }
