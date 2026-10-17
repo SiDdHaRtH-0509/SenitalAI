@@ -24,13 +24,14 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
-- [ ] Confirm sample video authorization and format.
+- [ ] Confirm sample video authorization and format (synthetic video verified; awaiting final datathon sample).
 - [x] Test OpenCV and selected pretrained detector in available environment.
 - [x] Implement video reader and configured zone.
 - [x] Implement documented zone-entry logic and temporal confirmation.
 - [x] Add event ID, timestamp, cooldown and deduplication.
-- [ ] Send exact payload to backend.
-- [ ] Test failure/replay fallback and document limitations.
+- [x] Send exact payload to backend (BackendClient verified via contract & mocks; live backend unverified).
+- [x] Test failure/replay fallback and document limitations.
+
 
 ## Lead 3 — LinuxONE / Environment
 - [ ] Obtain official environment access and deployment requirements.

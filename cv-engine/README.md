@@ -1,7 +1,7 @@
 # SentinelAI — Computer Vision Engine (`cv-engine`)
 
 **Role:** Lead 2 (Computer Vision & Event Producer)  
-**Current Status:** Phase 4 Complete (Event Generation & Backend Integration)
+**Current Status:** Phase 5 Complete — Production-Ready Handover (v1.0.0)
 
 ---
 
@@ -10,29 +10,30 @@
 The `cv-engine` is the visual processing subsystem of **SentinelAI**, an AI-based intelligent video analytics platform for border surveillance using existing CCTV infrastructure.
 
 Its responsibilities within the SentinelAI architecture:
-1. Ingest authorized CCTV video streams or prerecorded footage sequentially.
+1. Ingest authorized CCTV video streams, prerecorded footage, or deterministic replay feeds.
 2. Extract frame buffers and attach validated sequence and elapsed timing metadata.
-3. Detect observable objects (specifically persons) using compatible pretrained detector models.
-4. Evaluate detections against configured restricted spatial zones (Phase 3).
-5. Apply temporal confirmation (multi-frame debouncing) and cooldown deduplication (Phase 4).
-6. Transmit structured, observable events conforming to `API_CONTRACT.md` to the backend API (Phase 4).
+3. Detect observable objects (specifically persons) using compatible pretrained detector models (YOLOv8n CPU) or deterministic replay adapters.
+4. Evaluate detections against configured restricted spatial zones using pure Python Ray-Casting geometry.
+5. Apply temporal confirmation (multi-frame debouncing) and cooldown deduplication.
+6. Transmit structured, observable events conforming to `API_CONTRACT.md` to the backend API (`POST /api/events`).
+7. Provide a zero-dependency deterministic replay fallback mode (`--replay`) for environments without model weights or camera hardware (such as IBM LinuxONE s390x testing).
 
 > **Architectural Boundary:**  
 > The Computer Vision engine only produces observable detections, spatial zone incursions, and detector statistical confidence (`confidence` ∈ `[0.0, 1.0]`). It **never** computes threat scores, intent probabilities, or risk levels. Risk scoring, risk levels, and explanation reasons are strictly owned and computed by the backend service.
 
 ---
 
-## 2. Phase 4 Capabilities & Current Status
+## 2. Capabilities & Architecture Summary
 
-Phase 4 completes the event generation and backend integration layer:
+The completed CV engine implements:
 - **API Contract Compliance:** Structured `SecurityEvent` model strictly adhering to `API_CONTRACT.md` (`POST /api/events`), including required fields: `event_id`, `camera_id`, `event_type`, `timestamp`, `severity`, `confidence`, `zone_id`, `description`, `evidence`.
-- **Occupancy & Zone-Entry Policy:** In the absence of a multi-object tracker, detections are frame-local. Events represent qualifying zone occupancy episodes rather than verified identity transitions.
+- **Occupancy & Zone-Entry Policy:** In the absence of a multi-object tracker, detections are frame-local (`evidence.track_id: null`). Events represent qualifying zone occupancy episodes rather than unverified identity tracks.
 - **Temporal Confirmation (Debounce):** Configurable multi-frame persistence requirement (`temporal_confirmation_frames >= 1`) prevents false positive triggers caused by single-frame detector flutter.
 - **Cooldown Deduplication:** Time-windowed cooldown (`deduplication_cooldown_sec`) suppresses redundant alerts while a subject remains continuously inside a restricted zone.
 - **Deterministic Event Identifiers:** Generates stable, reproducible event IDs (`evt-{camera_id}-{zone_id}-{sha_suffix}`) derived from observation attributes via SHA-256 without relying on random UUIDs or Python's built-in `hash()`.
 - **Resilient Backend Client:** Built on Python's standard library `urllib.request` (zero native C-dependencies), with explicit connection and read timeouts, bounded exponential backoff retries for transient 5xx errors, immediate rejection of 4xx client errors, and contract-compliant HTTP 409 idempotent duplicate handling.
-- **Dependency Injection for Testing:** Injected transport callable allows 100% deterministic, offline automated unit tests covering all HTTP success and failure modes.
-- **Comprehensive Automated Test Suite:** 115 passing automated unit and integration tests across all four phases.
+- **Deterministic Replay Fallback Mode:** Pre-scripted synthetic video stream (`ReplayVideoSource`) and trajectory detector (`create_replay_detector`) allowing end-to-end simulation of video processing, incursion detection, and event emission without external video files, GPUs, or model downloads.
+- **Comprehensive Automated Test Suite:** 121 passing automated unit and integration tests across all five phases with 0 failures and 0 errors.
 
 ---
 
@@ -46,29 +47,29 @@ cv-engine/
 ├── README.md                 # Complete CV engine documentation
 ├── src/
 │   └── sentinel_cv/
-│       ├── __init__.py       # Package exports and version metadata (v0.4.0)
+│       ├── __init__.py       # Package exports and version metadata (v1.0.0)
 │       ├── __main__.py       # Executable module entry point
 │       ├── backend_client.py # HTTP client with bounded retries & timeout controls
-│       ├── cli.py            # CLI entry point (arguments, summaries, JSON output)
+│       ├── cli.py            # CLI entry point (arguments, summaries, JSON output, --replay)
 │       ├── config.py         # CVConfig dataclass with strict validation
-│       ├── detector.py       # YOLOPersonDetector, MockPersonDetector, factory
+│       ├── detector.py       # YOLOPersonDetector, MockPersonDetector, create_replay_detector
 │       ├── event_generator.py# Temporal debouncing, cooldown, SecurityEvent builder
 │       ├── interfaces.py     # IVideoSource, IDetector, IZoneAnalyzer, IEventGenerator, IBackendClient
 │       ├── logging_config.py # Structured logging setup & namespaces
 │       ├── models.py         # BoundingBox, Detection, FrameMetadata, SecurityEvent, PipelineResult
 │       ├── pipeline.py       # CVPipeline streaming orchestrator
-│       ├── video_source.py   # OpenCVVideoSource with zero-division safe FPS
+│       ├── video_source.py   # OpenCVVideoSource & ReplayVideoSource
 │       └── zone.py           # PolygonZone, ZoneAnalyzer, ray-casting point-in-polygon
 └── tests/
     ├── __init__.py
     ├── test_backend_client.py # HTTP client success, 4xx, 5xx, timeout, retry tests
-    ├── test_cli.py           # CLI argument and execution tests
+    ├── test_cli.py           # CLI argument, JSON mode, and replay execution tests
     ├── test_config.py        # Config defaults, env loading, validation error tests
     ├── test_detector.py      # YOLO class filtering, confidence bounds, boundary tests
     ├── test_event_generator.py# Event schema, debounce, cooldown, deterministic ID tests
     ├── test_models.py        # Geometry, detection, metadata, security event tests
-    ├── test_pipeline.py      # Lifecycle, streaming, max_frames, end-to-end integration tests
-    ├── test_video_source.py  # Sequential reads, fallback FPS, EOF, context manager
+    ├── test_pipeline.py      # Streaming, replay mode, end-to-end integration tests
+    ├── test_video_source.py  # OpenCV & ReplayVideoSource sequential reads, fallback FPS, EOF
     └── test_zone.py          # Polygon geometry, boundary tolerance, ray-casting, strategies
 ```
 
@@ -253,13 +254,16 @@ if result.success:
 
 ## 9. Command-Line Interface (CLI)
 
-Run person detection, zone analysis, and backend event submission on local video feeds:
+Run person detection, zone analysis, and backend event submission on local video feeds or deterministic replay streams:
 
 ```bash
-# Basic run with frame limit
+# 1. Deterministic Replay Fallback Mode (CPU-friendly, no camera/model files needed)
+python -m sentinel_cv --replay --disable-events --json
+
+# 2. Basic run with local video file and frame limit
 python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --max-frames 100
 
-# Run with custom model, confidence, and restricted zone
+# 3. Run with custom model, confidence, and restricted zone
 python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 \
   --zone-id perimeter_buffer \
   --zone-vertices "[(100,200),(500,200),(500,600),(100,600)]" \
@@ -267,21 +271,21 @@ python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 \
   --confidence 0.65 \
   --max-frames 50
 
-# Run with live backend submission
+# 4. Run with live backend submission and custom debouncing/cooldown
 python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 \
   --backend-url http://localhost:8000 \
   --severity HIGH \
   --debounce 2 \
   --cooldown 10.0
 
-# Disable backend submission for offline evaluation
-python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --disable-events --json
+# 5. Output structured per-frame JSON stream for pipeline piping
+python -m sentinel_cv --replay --per-frame-json
 ```
 
 ### Example Summary Output:
 ```text
 ========================================================
- SENTINELAI CV ENGINE — VIDEO & EVENT PROCESSING SUMMARY
+ SENTINELAI CV ENGINE — VIDEO & EVENT SUMMARY
 ========================================================
  Video Source:            sample-data/synthetic_border_test.mp4
  Camera ID:               cam-demo-01
@@ -304,7 +308,7 @@ python -m sentinel_cv --video sample-data/synthetic_border_test.mp4 --disable-ev
 
 ## 10. Running Automated Tests
 
-Run the complete test suite (115 tests) using Python's standard `unittest` runner:
+Run the complete test suite (121 tests) using Python's standard `unittest` runner:
 
 ```bash
 # Windows PowerShell
@@ -314,7 +318,7 @@ $env:PYTHONPATH="src"; python -m unittest discover -v -s tests -p "test_*.py"
 PYTHONPATH=src python3 -m unittest discover -v -s tests -p "test_*.py"
 ```
 
-All 115 unit and integration tests run deterministically without internet access, physical cameras, or a live backend server.
+All 121 unit and integration tests run deterministically without internet access, physical cameras, or a live backend server.
 
 ---
 
@@ -337,17 +341,30 @@ All 115 unit and integration tests run deterministically without internet access
 - **Geometry & Spatial Analysis:** 100% pure Python standard library (`sentinel_cv.zone`). Zero native C-extensions required.
 - **Event Generation & HTTP Client:** 100% pure Python standard library (`hashlib`, `datetime`, `urllib.request`). Zero third-party network libraries required.
 - **Target Architecture Status (`s390x`):**
-  - Pure Python components (`models.py`, `config.py`, `interfaces.py`, `pipeline.py`, `zone.py`, `event_generator.py`, `backend_client.py`, `MockPersonDetector`) are 100% architecture-neutral.
+  - Pure Python components (`models.py`, `config.py`, `interfaces.py`, `pipeline.py`, `zone.py`, `event_generator.py`, `backend_client.py`, `MockPersonDetector`, `ReplayVideoSource`) are 100% architecture-neutral.
   - On `s390x` LinuxONE systems where PyTorch/Ultralytics wheels may not be pre-compiled, the engine provides:
-    1. `MockPersonDetector` for offline verification and CI testing.
+    1. Deterministic replay mode (`python -m sentinel_cv --replay --json`) for zero-dependency end-to-end verification.
     2. Architecture fallback: Running the CV engine on an authorized workstation and streaming structured events over HTTP to the LinuxONE backend per `ARCHITECTURE.md`.
 
 ---
 
-## 13. Planned Progression
+## 13. Roadmap & Phase Completion Status
 
-- **Phase 1 (Complete):** CV Engine Foundation, Configuration, Models, Interfaces, Logging, Tests.
+- **Phase 1 (Complete):** CV Engine Foundation, Configuration, Models, Interfaces, Logging, Foundation Tests.
 - **Phase 2 (Complete):** Video Ingestion & Person Detection Adapter (`OpenCVVideoSource`, `YOLOPersonDetector`, streaming pipeline, CLI, unit tests).
 - **Phase 3 (Complete):** Configurable Restricted Zone & Person-vs-Zone Spatial Analysis (`PolygonZone`, Ray-Casting algorithm, ground-contact reference point, `ZoneAnalyzer`, unit/integration tests).
 - **Phase 4 (Complete):** Event Generation & Backend Ingestion Client (`SecurityEvent` contract schema, temporal debouncing, cooldown deduplication, deterministic IDs, `BackendClient`, unit/integration tests).
-- **Phase 5:** End-to-End Integration, Replay Fallback, Benchmarking & Final Documentation.
+- **Phase 5 (Complete):** Final Verification, Deterministic Replay Fallback Mode (`ReplayVideoSource`, `create_replay_detector`), Comprehensive 121-Test Suite, Handover Documentation.
+
+---
+
+## 14. Troubleshooting Common Failures
+
+| Issue | Cause | Resolution |
+| :--- | :--- | :--- |
+| `[WinError 10061]` or connection refused | Backend server is not running on configured port. | Run with `--disable-events` for offline evaluation, or ensure backend is running (`uvicorn app:app --port 8000`). |
+| `Video file does not exist` | Invalid path passed to `--video`. | Provide an authorized video file path or use `--replay` for synthetic replay evaluation. |
+| `Invalid reference_point_strategy` | Typo in strategy argument. | Use either `bottom_center` (recommended ground-plane anchor) or `center`. |
+| `ModelLoadingError: Ultralytics package is not installed` | Missing detection dependency in clean environment. | Run `pip install ultralytics` or pass `--model mock` / `--replay` to run without model dependencies. |
+| `HTTP 409 Conflict` | Event ID already submitted to backend. | Expected idempotent behavior; the backend client logs this as an idempotent duplicate and continues without raising an error. |
+

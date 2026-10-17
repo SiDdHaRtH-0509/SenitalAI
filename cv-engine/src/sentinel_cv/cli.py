@@ -135,6 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output final execution summary in JSON format",
     )
     parser.add_argument(
+        "--replay",
+        action="store_true",
+        help="Run deterministic replay fallback mode with pre-scripted zone incursion trajectory",
+    )
+    parser.add_argument(
         "--per-frame-json",
         action="store_true",
         help="Output structured per-frame detections and zone evaluations",
@@ -176,10 +181,11 @@ def run_cli(args: Optional[List[str]] = None) -> int:
             return 1
 
     # Build config
-    model_type = "mock" if parsed.model.lower() in {"mock", "test"} else "yolo"
+    model_type = "replay" if parsed.replay else ("mock" if parsed.model.lower() in {"mock", "test"} else "yolo")
+    input_source_type = "replay" if parsed.replay else "file"
     try:
         config = CVConfig(
-            input_source_type="file",
+            input_source_type=input_source_type,
             video_source=parsed.video,
             camera_id=parsed.camera_id,
             zone_id=parsed.zone_id,
@@ -195,6 +201,7 @@ def run_cli(args: Optional[List[str]] = None) -> int:
             event_severity=parsed.severity,
             temporal_confirmation_frames=parsed.debounce,
             deduplication_cooldown_sec=parsed.cooldown,
+            replay_mode=parsed.replay,
         )
     except ConfigurationError as cfg_err:
         logger.error("Configuration error: %s", cfg_err)
@@ -239,12 +246,13 @@ def run_cli(args: Optional[List[str]] = None) -> int:
 
     summary = {
         "status": "success",
-        "video_source": parsed.video,
+        "replay_mode": config.replay_mode,
+        "video_source": parsed.video if not config.replay_mode else "replay-synthetic-stream",
         "camera_id": parsed.camera_id,
         "zone_id": parsed.zone_id,
         "reference_point_strategy": config.reference_point_strategy,
         "model_type": config.model_type,
-        "model_path": config.model_path,
+        "model_path": config.model_path if not config.replay_mode else "deterministic-replay-adapter",
         "confidence_threshold": config.confidence_threshold,
         "backend_url": config.backend_url,
         "events_enabled": config.events_enabled,
@@ -259,9 +267,12 @@ def run_cli(args: Optional[List[str]] = None) -> int:
     if parsed.json:
         print(json.dumps(summary, indent=2))
     else:
+        mode_label = " (REPLAY FALLBACK MODE)" if summary["replay_mode"] else ""
         print("\n========================================================")
-        print(" SENTINELAI CV ENGINE — VIDEO & EVENT PROCESSING SUMMARY")
+        print(f" SENTINELAI CV ENGINE — VIDEO & EVENT SUMMARY{mode_label}")
         print("========================================================")
+        if summary["replay_mode"]:
+            print(" Execution Mode:          DETERMINISTIC REPLAY (SYNTHETIC)")
         print(f" Video Source:            {summary['video_source']}")
         print(f" Camera ID:               {summary['camera_id']}")
         print(f" Monitored Zone ID:       {summary['zone_id']}")

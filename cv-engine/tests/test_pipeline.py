@@ -384,8 +384,40 @@ class TestCVPipeline(unittest.TestCase):
         self.assertEqual(submitted_events[0]["camera_id"], "cam-live-01")
         self.assertEqual(submitted_events[0]["event_type"], "RESTRICTED_ZONE_ENTRY")
 
+    # --- Phase 5 Specific Tests ---
+
+    def test_pipeline_replay_mode_end_to_end(self) -> None:
+        """Verify pipeline execution with replay_mode generates events and executes cleanly."""
+        cfg = CVConfig(
+            replay_mode=True,
+            video_source="non_existent_file.mp4",
+            camera_id="cam-replay-01",
+            temporal_confirmation_frames=1,
+            deduplication_cooldown_sec=5.0,
+            events_enabled=False,  # Offline test mode
+        )
+        pipeline = CVPipeline.from_config(config=cfg, auto_init=True)
+        self.assertTrue(pipeline.is_initialized)
+
+        results = pipeline.run(max_frames=6)
+        self.assertEqual(len(results), 6)
+
+        total_detections = sum(len(r.detections) for r in results)
+        total_incursions = sum(len(r.inside_zone_results) for r in results)
+        total_events = sum(len(r.events) for r in results)
+
+        self.assertEqual(total_detections, 6)
+        self.assertEqual(total_incursions, 4)
+        self.assertEqual(total_events, 1)
+
+        event = results[2].events[0]
+        self.assertEqual(event.camera_id, "cam-replay-01")
+        self.assertEqual(event.event_type, "RESTRICTED_ZONE_ENTRY")
+        self.assertAlmostEqual(event.confidence, 0.93)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

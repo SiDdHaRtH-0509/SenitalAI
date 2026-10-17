@@ -288,6 +288,25 @@ class YOLOPersonDetector(IDetector):
         return detections
 
 
+def create_replay_detector() -> MockPersonDetector:
+    """Create a deterministic mock detector pre-configured with a zone-incursion trajectory."""
+    # Frame 0: Outside zone (foot at (140, 250))
+    f0 = [Detection(class_name="person", confidence=0.88, bbox=BoundingBox(100.0, 100.0, 180.0, 250.0))]
+    # Frame 1: Outside zone (foot at (240, 290))
+    f1 = [Detection(class_name="person", confidence=0.89, bbox=BoundingBox(200.0, 150.0, 280.0, 290.0))]
+    # Frame 2: Entering zone (foot at (360, 380) -> inside default zone [300, 300, 980, 700])
+    f2 = [Detection(class_name="person", confidence=0.93, bbox=BoundingBox(320.0, 220.0, 400.0, 380.0))]
+    # Frame 3: Inside zone (foot at (420, 420))
+    f3 = [Detection(class_name="person", confidence=0.95, bbox=BoundingBox(380.0, 260.0, 460.0, 420.0))]
+    # Frame 4: Inside zone (foot at (480, 460))
+    f4 = [Detection(class_name="person", confidence=0.94, bbox=BoundingBox(440.0, 300.0, 520.0, 460.0))]
+    # Frame 5: Inside zone (foot at (540, 500))
+    f5 = [Detection(class_name="person", confidence=0.92, bbox=BoundingBox(500.0, 340.0, 580.0, 500.0))]
+
+    canned = {0: f0, 1: f1, 2: f2, 3: f3, 4: f4, 5: f5}
+    return MockPersonDetector(canned_detections=canned)
+
+
 def create_detector(config: CVConfig) -> IDetector:
     """Factory creating an IDetector based on CVConfig.
 
@@ -299,12 +318,16 @@ def create_detector(config: CVConfig) -> IDetector:
     """
     model_type = config.model_type.strip().lower()
 
+    if getattr(config, "replay_mode", False) or model_type in {"replay", "demo"}:
+        logger.info("Instantiating deterministic Replay detector for replay fallback mode.")
+        return create_replay_detector()
+
     if model_type in {"mock", "test"}:
         logger.info("Instantiating MockPersonDetector for testing/offline mode.")
         return MockPersonDetector()
 
     if model_type in {"yolo", "yolov8", "ultralytics", "placeholder"}:
-        # In Phase 2, default placeholder or yolo maps to YOLOPersonDetector
+        # In Phase 2+, default placeholder or yolo maps to YOLOPersonDetector
         model_target = config.model_path or YOLOPersonDetector.DEFAULT_MODEL
         logger.info("Instantiating YOLOPersonDetector with target: %s", model_target)
         return YOLOPersonDetector(
@@ -313,5 +336,6 @@ def create_detector(config: CVConfig) -> IDetector:
         )
 
     raise ConfigurationError(
-        f"Unsupported model_type '{config.model_type}'. Supported: 'yolo', 'mock'."
+        f"Unsupported model_type '{config.model_type}'. Supported: 'yolo', 'mock', 'replay'."
     )
+

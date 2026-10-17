@@ -191,5 +191,81 @@ class TestOpenCVVideoSource(unittest.TestCase):
         self.assertFalse(src.is_opened())
 
 
+class TestReplayVideoSource(unittest.TestCase):
+    """Test suite for ReplayVideoSource and create_video_source factory."""
+
+    def test_replay_video_source_lifecycle(self) -> None:
+        """Verify ReplayVideoSource generates synthetic frames up to limit."""
+        from sentinel_cv.video_source import ReplayVideoSource
+
+        source = ReplayVideoSource(total_frames=3, fps=10.0, width=640, height=480, source_id="test-cam")
+        self.assertFalse(source.is_opened())
+        self.assertTrue(source.open())
+        self.assertTrue(source.is_opened())
+        self.assertEqual(source.fps, 10.0)
+        self.assertEqual(source.width, 640)
+        self.assertEqual(source.height, 480)
+        self.assertEqual(source.total_frames, 3)
+
+        frames_read = 0
+        for i in range(5):
+            success, frame, meta = source.read_frame()
+            if not success:
+                break
+            frames_read += 1
+            self.assertIsNotNone(frame)
+            self.assertIsNotNone(meta)
+            self.assertEqual(meta.frame_index, i)
+            self.assertAlmostEqual(meta.timestamp, i * 0.1)
+            self.assertEqual(meta.source_id, "test-cam")
+
+        self.assertEqual(frames_read, 3)
+        self.assertEqual(source.frames_read, 3)
+        source.close()
+        self.assertFalse(source.is_opened())
+
+    def test_replay_video_source_invalid_parameters(self) -> None:
+        """Verify invalid parameters raise ValueError."""
+        from sentinel_cv.video_source import ReplayVideoSource
+
+        with self.assertRaises(ValueError):
+            ReplayVideoSource(total_frames=0)
+        with self.assertRaises(ValueError):
+            ReplayVideoSource(fps=0.0)
+        with self.assertRaises(ValueError):
+            ReplayVideoSource(fps=-5.0)
+        with self.assertRaises(ValueError):
+            ReplayVideoSource(width=0)
+        with self.assertRaises(ValueError):
+            ReplayVideoSource(height=-10)
+
+    def test_replay_video_source_context_manager(self) -> None:
+        """Verify context manager protocol works for ReplayVideoSource."""
+        from sentinel_cv.video_source import ReplayVideoSource
+
+        with ReplayVideoSource(total_frames=2) as src:
+            self.assertTrue(src.is_opened())
+            ret, _, meta = src.read_frame()
+            self.assertTrue(ret)
+            self.assertEqual(meta.frame_index, 0)
+        self.assertFalse(src.is_opened())
+
+    def test_create_video_source_factory(self) -> None:
+        """Verify create_video_source returns ReplayVideoSource when replay is requested."""
+        from sentinel_cv.config import CVConfig
+        from sentinel_cv.video_source import OpenCVVideoSource, ReplayVideoSource, create_video_source
+
+        # Replay mode with missing video file -> ReplayVideoSource
+        cfg_replay = CVConfig(replay_mode=True, video_source="non_existent_file.mp4")
+        src = create_video_source(cfg_replay)
+        self.assertIsInstance(src, ReplayVideoSource)
+
+        # Standard file mode -> OpenCVVideoSource
+        cfg_file = CVConfig(input_source_type="file", video_source="sample.mp4")
+        src2 = create_video_source(cfg_file)
+        self.assertIsInstance(src2, OpenCVVideoSource)
+
+
 if __name__ == "__main__":
     unittest.main()
+
