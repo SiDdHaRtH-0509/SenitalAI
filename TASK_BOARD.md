@@ -25,7 +25,7 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
 - [ ] Confirm sample video authorization and format.
-- [ ] Test OpenCV and selected pretrained detector in available environment.
+- [x] Test OpenCV and selected pretrained detector in available environment.
 - [ ] Implement video reader and configured zone.
 - [ ] Implement documented zone-entry logic and temporal confirmation.
 - [ ] Add event ID, timestamp, cooldown and deduplication.

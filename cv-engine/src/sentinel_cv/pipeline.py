@@ -1,17 +1,25 @@
 """Pipeline orchestration module for SentinelAI Computer Vision Engine.
 
-Provides the foundational CVPipeline class implementing ICVPipeline.
-In Phase 1, this class validates configuration, lifecycle state management,
-metadata handling, and interface contracts. Video decoding and object detection
-are intentionally deferred to Phase 2.
+Connects video acquisition, frame metadata generation, and object detector
+evaluation into an incremental, streaming processing pipeline.
+
+Phase 2 capabilities:
+- Incremental frame extraction via OpenCVVideoSource.
+- Validated FrameMetadata generation.
+- Person detection via IDetector (YOLOPersonDetector / MockPersonDetector).
+- Streaming generator process_stream() preventing buffering frames in memory.
+- Optional max_frames processing limits for controlled evaluation.
+- Clean resource reclamation on EOF, limit reached, or exception.
 """
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple
 
 from sentinel_cv.config import CVConfig, ConfigurationError
+from sentinel_cv.detector import create_detector
 from sentinel_cv.interfaces import ICVPipeline, IDetector, IVideoSource
 from sentinel_cv.logging_config import get_logger, setup_logging
 from sentinel_cv.models import Detection, FrameMetadata, PipelineResult
+from sentinel_cv.video_source import OpenCVVideoSource, VideoSourceError
 
 logger = get_logger("pipeline")
 
@@ -19,9 +27,8 @@ logger = get_logger("pipeline")
 class CVPipeline(ICVPipeline):
     """Computer vision pipeline orchestrator for SentinelAI.
 
-    Manages lifecycle states (initialization, execution, termination)
-    and routes frames through video acquisition, detector evaluation,
-    and structured result generation.
+    Coordinates video stream ingestion, object detection, and structured
+    result production.
     """
 
     def __init__(
@@ -34,8 +41,8 @@ class CVPipeline(ICVPipeline):
 
         Args:
             config: CVConfig instance. If None, loads defaults from environment.
-            video_source: Video source adapter (Phase 2).
-            detector: Object detector adapter (Phase 2).
+            video_source: Video source adapter (e.g. OpenCVVideoSource).
+            detector: Object detector adapter (e.g. YOLOPersonDetector).
         """
         self.config: CVConfig = config if config is not None else CVConfig.from_env()
         self.video_source: Optional[IVideoSource] = video_source
@@ -43,6 +50,34 @@ class CVPipeline(ICVPipeline):
 
         self._is_initialized: bool = False
         self._is_running: bool = False
+
+    @classmethod
+    def from_config(
+        cls,
+        config: Optional[CVConfig] = None,
+        auto_init: bool = True,
+    ) -> "CVPipeline":
+        """Factory creating a fully wired pipeline from configuration.
+
+        Args:
+            config: CVConfig instance or None to read environment.
+            auto_init: If True, calls initialize() before returning.
+
+        Returns:
+            CVPipeline: Configured pipeline with video source and detector.
+        """
+        cfg = config if config is not None else CVConfig.from_env()
+        source = OpenCVVideoSource(
+            source=cfg.video_source,
+            source_id=cfg.camera_id,
+            fallback_fps=cfg.target_fps,
+        )
+        detector = create_detector(cfg)
+
+        pipeline = cls(config=cfg, video_source=source, detector=detector)
+        if auto_init:
+            pipeline.initialize()
+        return pipeline
 
     @property
     def is_initialized(self) -> bool:
@@ -65,7 +100,7 @@ class CVPipeline(ICVPipeline):
         """
         setup_logging(log_level=self.config.log_level)
         logger.info(
-            "Initializing SentinelAI CV Pipeline (Phase 1 Foundation) | "
+            "Initializing SentinelAI CV Pipeline | "
             "Source Type: %s | Source: %s | Camera: %s | Target: %sx%s @ %s FPS",
             self.config.input_source_type,
             self.config.video_source,
@@ -102,7 +137,7 @@ class CVPipeline(ICVPipeline):
             metadata: Associated FrameMetadata.
 
         Returns:
-            PipelineResult: Predictable output structure.
+            PipelineResult: Structured processing result.
 
         Raises:
             RuntimeError: If called before pipeline is initialized.
@@ -116,15 +151,13 @@ class CVPipeline(ICVPipeline):
                 f"metadata must be an instance of FrameMetadata, got {type(metadata).__name__}"
             )
 
-        # In Phase 1, if an active detector is passed, we delegate to it.
-        # Otherwise, we return a structured result with zero detections and clear status.
         if self.detector is not None and self.detector.is_ready():
             detections = self.detector.detect(frame, metadata)
             return PipelineResult(
                 metadata=metadata,
                 detections=tuple(detections),
                 processed=True,
-                status_message="Frame processed by attached detector adapter.",
+                status_message=f"Detected {len(detections)} object(s).",
             )
 
         return PipelineResult(
@@ -137,15 +170,23 @@ class CVPipeline(ICVPipeline):
             ),
         )
 
-    def run(self) -> None:
-        """Execute the continuous video processing loop.
+    def process_stream(
+        self,
+        max_frames: Optional[int] = None,
+        progress_interval: int = 50,
+    ) -> Iterator[PipelineResult]:
+        """Streamingly process video frames one by one without buffering full video.
+
+        Yields:
+            PipelineResult: Structured detection results for each frame.
 
         Raises:
             RuntimeError: If pipeline is not initialized.
-            NotImplementedError: In Phase 1 when video source reader is not yet attached.
+            NotImplementedError: If video source reader is not attached.
+            VideoSourceError: If the video source cannot be opened.
         """
         if not self._is_initialized:
-            raise RuntimeError("CVPipeline must be initialized before running.")
+            raise RuntimeError("CVPipeline must be initialized before processing stream.")
 
         if self.video_source is None:
             raise NotImplementedError(
@@ -153,29 +194,76 @@ class CVPipeline(ICVPipeline):
                 "OpenCV video acquisition will be implemented in Phase 2."
             )
 
+        if max_frames is not None and max_frames <= 0:
+            return
+
         self._is_running = True
-        logger.info("Starting processing loop...")
+        logger.info(
+            "Beginning video stream processing (max_frames=%s)...",
+            max_frames if max_frames is not None else "unlimited",
+        )
+
+        frames_processed = 0
+        total_detections = 0
 
         try:
             if not self.video_source.is_opened():
                 opened = self.video_source.open()
                 if not opened:
                     logger.error("Failed to open video source: %s", self.config.video_source)
-                    return
+                    raise VideoSourceError(f"Failed to open video source: {self.config.video_source}")
 
             while self._is_running:
-                success, frame, metadata = self.video_source.read_frame()
-                if not success or frame is None or metadata is None:
-                    logger.info("End of video stream or read failure reached.")
+                if max_frames is not None and frames_processed >= max_frames:
+                    logger.info("Reached configured frame processing limit (%d frames).", max_frames)
                     break
 
-                _ = self.process_frame(frame, metadata)
+                success, frame, metadata = self.video_source.read_frame()
+                if not success or frame is None or metadata is None:
+                    logger.info("End of video stream or read termination reached.")
+                    break
+
+                result = self.process_frame(frame, metadata)
+                frames_processed += 1
+                total_detections += len(result.detections)
+
+                if frames_processed % progress_interval == 0:
+                    logger.info(
+                        "Progress: Processed %d frames | Cumulative Person Detections: %d",
+                        frames_processed,
+                        total_detections,
+                    )
+
+                yield result
         finally:
             self.stop()
+            logger.info(
+                "Video processing finished. Total frames processed: %d | Total person detections: %d",
+                frames_processed,
+                total_detections,
+            )
+
+    def run(self, max_frames: Optional[int] = None) -> List[PipelineResult]:
+        """Execute the continuous video processing loop and return results list.
+
+        Args:
+            max_frames: Optional limit on the number of frames to process.
+
+        Returns:
+            List[PipelineResult]: Collected results for the processed frames.
+
+        Raises:
+            RuntimeError: If pipeline is not initialized.
+            NotImplementedError: In Phase 1 when video source reader is not yet attached.
+        """
+        results: List[PipelineResult] = []
+        for res in self.process_stream(max_frames=max_frames):
+            results.append(res)
+        return results
 
     def stop(self) -> None:
         """Stop the processing loop and release resources."""
         self._is_running = False
         if self.video_source is not None and self.video_source.is_opened():
             self.video_source.close()
-        logger.info("Pipeline processing stopped.")
+        logger.debug("Pipeline processing stopped.")

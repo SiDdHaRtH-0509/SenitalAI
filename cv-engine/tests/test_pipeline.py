@@ -1,4 +1,4 @@
-"""Automated tests for CV Engine Pipeline orchestration and lifecycle."""
+"""Automated tests for CV Engine Pipeline orchestration, streaming, and lifecycle."""
 
 from typing import Any, List, Optional, Tuple
 import unittest
@@ -26,7 +26,7 @@ class MockDetector(IDetector):
 class MockVideoSource(IVideoSource):
     """Mock video source used strictly for testing pipeline loop orchestration."""
 
-    def __init__(self, max_frames: int = 2) -> None:
+    def __init__(self, max_frames: int = 5) -> None:
         self.max_frames = max_frames
         self.current_frame = 0
         self._opened = False
@@ -55,7 +55,7 @@ class MockVideoSource(IVideoSource):
 
 
 class TestCVPipeline(unittest.TestCase):
-    """Test suite for CVPipeline initialization, frame routing, and lifecycle."""
+    """Test suite for CVPipeline initialization, frame routing, streaming, and lifecycle."""
 
     def setUp(self) -> None:
         self.config = CVConfig(
@@ -138,11 +138,67 @@ class TestCVPipeline(unittest.TestCase):
         pipeline = CVPipeline(config=self.config, video_source=mock_source)
         pipeline.initialize()
 
-        pipeline.run()
+        results = pipeline.run()
 
         self.assertFalse(pipeline.is_running)
         self.assertFalse(mock_source.is_opened())
-        self.assertEqual(mock_source.current_frame, 3)
+        self.assertEqual(len(results), 3)
+
+    # --- Phase 2 Specific Tests ---
+
+    def test_process_stream_streaming_incremental(self) -> None:
+        """Verify process_stream yields results incrementally in sequential order."""
+        mock_source = MockVideoSource(max_frames=4)
+        mock_detector = MockDetector(ready=True)
+        pipeline = CVPipeline(config=self.config, video_source=mock_source, detector=mock_detector)
+        pipeline.initialize()
+
+        stream = pipeline.process_stream()
+        results = []
+        for res in stream:
+            self.assertIsInstance(res, PipelineResult)
+            self.assertTrue(res.processed)
+            self.assertEqual(len(res.detections), 1)
+            results.append(res)
+
+        self.assertEqual(len(results), 4)
+        self.assertEqual([r.metadata.frame_index for r in results], [0, 1, 2, 3])
+        self.assertFalse(pipeline.is_running)
+        self.assertFalse(mock_source.is_opened())
+
+    def test_process_stream_max_frames_limit(self) -> None:
+        """Verify process_stream terminates immediately upon reaching max_frames."""
+        mock_source = MockVideoSource(max_frames=10)
+        pipeline = CVPipeline(config=self.config, video_source=mock_source)
+        pipeline.initialize()
+
+        results = list(pipeline.process_stream(max_frames=2))
+        self.assertEqual(len(results), 2)
+        self.assertFalse(pipeline.is_running)
+        self.assertFalse(mock_source.is_opened())
+
+    def test_process_stream_uninitialized_raises_runtime_error(self) -> None:
+        """Verify calling process_stream before initialize raises RuntimeError."""
+        with self.assertRaises(RuntimeError):
+            next(self.pipeline.process_stream())
+
+    def test_process_stream_without_source_raises_not_implemented(self) -> None:
+        """Verify calling process_stream without video source raises NotImplementedError."""
+        self.pipeline.initialize()
+        with self.assertRaises(NotImplementedError):
+            next(self.pipeline.process_stream())
+
+    def test_pipeline_from_config_factory(self) -> None:
+        """Verify CVPipeline.from_config factory creates and initializes components."""
+        cfg = CVConfig(
+            video_source="sample-data/demo.mp4",
+            camera_id="cam-factory",
+            model_type="mock",
+        )
+        pipeline = CVPipeline.from_config(config=cfg, auto_init=True)
+        self.assertTrue(pipeline.is_initialized)
+        self.assertIsNotNone(pipeline.video_source)
+        self.assertIsNotNone(pipeline.detector)
 
 
 if __name__ == "__main__":

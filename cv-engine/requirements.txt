@@ -1,20 +1,15 @@
-# SentinelAI CV Engine - Phase 1 Dependencies
+# SentinelAI CV Engine - Dependencies (Phase 2)
 # ====================================================
-# Phase 1 is the CV Engine Foundation.
-# It strictly relies on the Python standard library:
-#   - dataclasses, typing, logging, math, os, abc, json
-#
-# No external ML packages, heavy frameworks, or native
-# C-extensions (such as OpenCV, PyTorch, Ultralytics, ONNX Runtime)
-# are required for Phase 1.
-#
-# This ensures 100% pure-Python architecture neutrality across:
-#   - x86-64 development machines
-#   - ARM64
-#   - IBM LinuxONE (s390x)
-#
-# Optional development / test runner:
-# The test suite runs out-of-the-box with Python's standard unittest:
-#   python -m unittest discover -s tests -p "test_*.py"
-# If running via pytest, pytest may optionally be installed:
-# pytest>=7.0.0
+# Video Ingestion & Person Detection:
+numpy>=1.23.0
+opencv-python!=4.13.0.90,>=4.7.0
+ultralytics>=8.0.0
+
+# Notes on IBM LinuxONE (s390x) Compatibility:
+# - OpenCV and NumPy are standard and can be installed via precompiled wheels or system packages (e.g. python3-opencv).
+# - Ultralytics YOLO executes on CPU without GPU hardware requirements.
+# - On s390x deployments where PyTorch / Ultralytics binary wheels are unverified or unavailable,
+#   the CV Engine provides:
+#     1) MockPersonDetector for deterministic testing and synthetic evaluation without model downloads.
+#     2) Architecture fallback: Running the CV engine on an authorized workstation and streaming
+#        structured events over HTTP to the LinuxONE backend per ARCHITECTURE.md.
