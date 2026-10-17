@@ -11,6 +11,7 @@ export interface EventEvidence {
   class_name: string;
   track_id: number | null;
   frame_number: number;
+  person_count?: number;
   bbox?: [number, number, number, number];
   reference_point?: [number, number];
 }
@@ -25,6 +26,7 @@ export interface SecurityEvent {
   zone_id: string | null;
   description: string;
   evidence: EventEvidence;
+  person_count?: number;
   risk_score?: number;
   risk_level?: RiskLevel;
   reasons?: string[];
@@ -43,6 +45,8 @@ export interface ServiceHealthItem {
   description: string;
   lastChecked: string;
   details?: string;
+  endpoint?: string;
+  latencyMs?: number | null;
 }
 
 export interface SystemHealthState {
@@ -69,7 +73,29 @@ export interface CameraInfo {
   resolution: string;
   fps: number;
   zone_id: string;
+  stream_uri?: string;
+  last_ping?: string;
   is_demo?: boolean;
+}
+
+export interface RestrictedZoneInfo {
+  zone_id: string;
+  name: string;
+  camera_id: string;
+  status: 'ACTIVE' | 'CALIBRATING' | 'INACTIVE';
+  vertices: Array<[number, number]>; // normalized [x, y] in [0, 1]
+  reference_strategy: string; // 'bottom_center' | 'center'
+  incursions_today: number;
+  description: string;
+  is_demo?: boolean;
+}
+
+export interface ClientSettings {
+  table_density: 'comfortable' | 'compact';
+  auto_refresh_interval: 0 | 10 | 30 | 60; // 0 = off, seconds
+  show_demo_notices: boolean;
+  enable_audio_alerts: boolean;
+  theme: 'dark-navy';
 }
 
 export type NavigationPage = 
