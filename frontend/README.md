@@ -1,8 +1,9 @@
 # SentinelAI — Frontend Command Operations Dashboard (Lead 1)
 
 **Component Owner:** Lead 1 — Frontend Engineer  
-**Current Phase:** Phase 4 — Real-Time Monitoring, Live Event Updates & Advanced Interactions  
+**Current Phase:** Phase 5 — Final QA, Performance Optimization & Demonstration Handover (Complete)  
 **Target Environment:** Localhost / IBM LinuxONE (s390x) Web Client  
+**Verification:** 51 Automated Tests Passing, 0 Type Errors, Production Build Verified  
 
 ---
 
@@ -228,8 +229,25 @@ Demonstration records are strictly segregated and visibly identified:
 
 ---
 
-## 10. Planned Features for Later Phases
+## 10. Completed Development Roadmap (Phases 1 - 5)
 
-- **Phase 3 (Live Video Streaming & WebSocket Ingestion):** Interactive WebRTC / HLS video stream player, real-time bounding box overlays on video canvas, and zone boundary drawing.
-- **Phase 4 (LinuxONE Production Deployment):** End-to-end integration with live FastAPI backend on IBM LinuxONE, database-persisted incident acknowledgements, and containerized deployment.
-- **Phase 5 (Hardening & Handover):** Final audit, end-to-end verification, and datathon submission package.
+- **Phase 1 (Foundation & Shell):** React 18 + Vite foundation, sidebar navigation, top header, KPI stat cards, and dark theme design tokens.
+- **Phase 2 (Dashboard Pages):** Complete interfaces for Live Monitoring, Security Events, Camera Registry, Restricted Zones, Surveillance Analytics, and System Health.
+- **Phase 3 (Backend Integration & Contracts):** Centralized `ApiClient`, typed error wrappers, configurable `VITE_API_BASE_URL`, and 12 contract tests.
+- **Phase 4 (Real-Time Monitoring & Telemetry):** `EventStreamService` polling loop, event deduplication, notification drawer, audio alert preference, and 20 real-time tests.
+- **Phase 5 (Final QA, Hardening & Handover):** Universal `ErrorBoundary`, crash-resilient formatters, WCAG keyboard accessibility, skip-to-content links, 51 passing automated tests, and comprehensive handover guide (`leads/lead-1-frontend/HANDOVER.md`).
+
+---
+
+## 11. Automated Testing Suite
+
+The frontend includes 51 automated tests executing via Node.js native test runner and `tsx`:
+- **Contract Tests (`tests/apiClient.test.ts`):** 12 integration tests covering HTTP status translations, timeouts, offline fallbacks, and payload normalization.
+- **Real-Time Tests (`tests/phase4Realtime.test.ts`):** 20 tests covering polling locks, deduplication, chronological sorting, audio preferences, and telemetry indicators.
+- **QA & Resilience Tests (`tests/phase5FinalQa.test.ts`):** 19 tests verifying UTC formatters, NaN protection, nullish search filters, demo schema conformance, and error boundary logic.
+
+Run the entire suite:
+```bash
+npm test
+```
+

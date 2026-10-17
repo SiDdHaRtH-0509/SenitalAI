@@ -42,6 +42,10 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   return (
     <div className="app-container">
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
       {/* Sidebar Navigation */}
       <Sidebar
         activePage={activePage}

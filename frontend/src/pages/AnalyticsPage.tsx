@@ -30,6 +30,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ events, isLive }) 
     const byCamera: Record<string, number> = {};
     const byZone: Record<string, number> = {};
     let totalConfidence = 0;
+    let validConfidenceCount = 0;
 
     // 24-hour distribution bins
     const hourlyCounts: number[] = new Array(24).fill(0);
@@ -48,12 +49,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ events, isLive }) 
       const z = evt.zone_id || 'unassigned';
       byZone[z] = (byZone[z] || 0) + 1;
 
-      totalConfidence += evt.confidence;
+      if (typeof evt.confidence === 'number' && !Number.isNaN(evt.confidence)) {
+        totalConfidence += evt.confidence;
+        validConfidenceCount++;
+      }
 
       // Hourly bin
       try {
-        const h = new Date(evt.timestamp).getUTCHours();
-        if (h >= 0 && h < 24) {
+        const parsed = new Date(evt.timestamp);
+        const h = parsed.getUTCHours();
+        if (!Number.isNaN(h) && h >= 0 && h < 24) {
           hourlyCounts[h]++;
         }
       } catch {
@@ -61,7 +66,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ events, isLive }) 
       }
     });
 
-    const avgConf = total > 0 ? (totalConfidence / total) * 100 : 0;
+    const avgConf = validConfidenceCount > 0 ? (totalConfidence / validConfidenceCount) * 100 : 0;
 
     return {
       total,

@@ -11,6 +11,8 @@ import { StatusBadge } from '../components/ui/StatusBadge';
 import { EventDetailModal } from '../components/dashboard/EventDetailModal';
 import { EmptyState } from '../components/ui/EmptyState';
 
+import { formatUtcTimestamp, formatConfidencePercent, safeLower } from '../utils/formatters';
+
 interface EventsPageProps {
   events: SecurityEvent[];
   isLive: boolean;
@@ -54,11 +56,11 @@ export const EventsPage: React.FC<EventsPageProps> = ({
         if (search.trim()) {
           const q = search.toLowerCase();
           const matches =
-            evt.event_id.toLowerCase().includes(q) ||
-            evt.camera_id.toLowerCase().includes(q) ||
-            evt.event_type.toLowerCase().includes(q) ||
-            (evt.zone_id && evt.zone_id.toLowerCase().includes(q)) ||
-            evt.description.toLowerCase().includes(q);
+            safeLower(evt.event_id).includes(q) ||
+            safeLower(evt.camera_id).includes(q) ||
+            safeLower(evt.event_type).includes(q) ||
+            safeLower(evt.zone_id).includes(q) ||
+            safeLower(evt.description).includes(q);
           if (!matches) return false;
         }
 
@@ -336,7 +338,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({
                       </span>
                     </td>
                     <td className="timestamp-cell">
-                      {new Date(evt.timestamp).toISOString().replace('T', ' ').replace('Z', ' UTC')}
+                      {formatUtcTimestamp(evt.timestamp)}
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
@@ -345,7 +347,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({
                     </td>
                     <td>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-text-highlight)' }}>
-                        {(evt.confidence * 100).toFixed(0)}%
+                        {formatConfidencePercent(evt.confidence)}
                       </span>
                     </td>
                     <td>

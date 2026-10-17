@@ -123,3 +123,37 @@ button:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* Accessibility: Skip to Content */
+.skip-to-content {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  background-color: var(--color-accent-blue);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+  z-index: 9999;
+  text-decoration: none;
+  box-shadow: var(--shadow-md);
+  transition: top 0.2s ease-in-out;
+}
+
+.skip-to-content:focus {
+  top: 16px;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* Universal Focus Visible for keyboard navigation */
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent-blue);
+  outline-offset: 2px;
+}
+
