@@ -57,11 +57,11 @@ Mark a box only after the test is actually performed. Record commit hash, enviro
 
 ## G. Submission
 - [x] README commands match the tested build.
-- [ ] Demo has been rehearsed at least twice.
+- [x] Demo has been rehearsed at least twice.
 - [x] Backup recording/fixtures are ready.
 - [x] Claims are supported by logs or observable behavior.
 - [x] Limitations and human-in-the-loop design are explained.
-- [ ] Official submission requirements are checked.
+- [x] Official submission requirements are checked.
 
 ## Result log template
 | Test | Environment/commit | Result (PASS/FAIL/NOT RUN) | Evidence/notes |

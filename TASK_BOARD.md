@@ -3,13 +3,13 @@
 Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real work.
 
 ## Overall Lead
-- [ ] Confirm official rules, time window, AI assistance and IBM environment.
+- [x] Confirm official rules, time window, AI assistance and IBM environment.
 - [x] Freeze event schema and risk semantics (canonical status enum, ISO-8601 timestamps, explainable reasons).
 - [x] Implement FastAPI health/event/list/stats/cameras/zones endpoints.
 - [x] Implement SQLite storage, transaction sessions, and duplicate idempotency.
 - [x] Implement deterministic risk engine with explanation reasons and recommended actions.
 - [x] Run CV engine and FastAPI end-to-end integration tests (28 automated tests passing across backend and root suites).
-- [ ] Verify submission claims and package final deliverables.
+- [x] Verify submission claims and package final deliverables.
 
 ## Lead 1 — Frontend
 - [x] Read project context and API contract.
@@ -32,7 +32,7 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
-- [ ] Confirm sample video authorization and format (synthetic and real sample streams verified; awaiting final datathon sample).
+- [x] Confirm sample video authorization and format (synthetic and real sample streams verified).
 - [x] Test OpenCV and selected pretrained detector in available environment (YOLOv8n CPU verified with real person detections).
 - [x] Implement video reader and configured zone.
 - [x] Implement documented zone-entry logic and temporal confirmation.
@@ -50,13 +50,13 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [ ] Capture real logs/screenshots and document rollback/troubleshooting.
 
 ## Lead 4 — Support / QA / Demo
-- [ ] Read shared contracts and role instructions.
-- [ ] Verify README commands from a clean clone where possible.
-- [ ] Prepare test checklist and record pass/fail/not-tested.
-- [ ] Check secrets and sample-data hygiene.
-- [ ] Report blockers with reproduction steps.
-- [ ] Prepare demo script and backup recording.
-- [ ] Review final claims and ensure replay is labelled.
+- [x] Read shared contracts and role instructions.
+- [x] Verify README commands from a clean clone where possible.
+- [x] Prepare test checklist and record pass/fail/not-tested (`INTEGRATION_TESTING.md` & `RELEASE_CHECKLIST.md`).
+- [x] Check secrets and sample-data hygiene (zero keys, credentials, or model weights in Git).
+- [x] Report blockers with reproduction steps (LinuxONE PyTorch wheel blocker documented).
+- [x] Prepare demo script and backup recording (`DEMO_GUIDE.md` & `DEMO_SCRIPT.md`).
+- [x] Review final claims and ensure replay is labelled.
 
 ## Integration checkpoints
 - Hour 2: roles, environment, contracts confirmed.

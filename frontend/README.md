@@ -70,10 +70,12 @@ The application will be served at:
 
 ## 6. Production Build & Verification Commands
 
+For live presentation procedures and checklist, see [`DEMO_GUIDE.md`](../DEMO_GUIDE.md) and [`RELEASE_CHECKLIST.md`](../RELEASE_CHECKLIST.md).
+
 To typecheck and compile the production bundle:
 
 ```bash
-# Execute test suite (32 contract, real-time, and integration test cases)
+# Execute test suite (51 contract, real-time, QA, and crash-resilience test cases)
 npm test
 
 # Type check without emitting files

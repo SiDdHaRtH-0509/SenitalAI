@@ -78,32 +78,41 @@ Follow `GITHUB_SETUP.md` to initialize this folder as a Git repository and push 
 7. Follow `LINUXONE_DEPLOYMENT.md` only after confirming the actual IBM environment and architecture.
 8. Rehearse `DEMO_SCRIPT.md`, keep a clearly labelled fallback, and submit according to official rules.
 
-## Local startup (starter scaffold)
-Backend:
+## Verified Local Startup Commands
+
+For comprehensive live demonstration procedures, see [`DEMO_GUIDE.md`](DEMO_GUIDE.md) and [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md).
+
+### 1. Backend REST API
 ```bash
 cd backend
-python -m venv .venv
-# Activate the environment for your shell; see ENVIRONMENT_SETUP.md
 python -m pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+py -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+- API Docs: `http://127.0.0.1:8000/docs`
+- Health check: `http://127.0.0.1:8000/api/health`
 
-Frontend:
+### 2. Frontend Command Dashboard
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+- Dashboard URL: `http://localhost:3000`
 
-Computer vision:
+### 3. Computer Vision Engine (Real YOLOv8n Inference)
 ```bash
 cd cv-engine
-python -m venv .venv
-python -m pip install -r requirements.txt
-python video_processor.py --help
+# Set PYTHONPATH to include src/
+$env:PYTHONPATH="src"  # PowerShell (or export PYTHONPATH=src on Bash)
+py -m sentinel_cv --video sample-data/real_person_stream.mp4 --model yolov8n.pt --camera-id cam-north-01 --zone-id zone-restricted-01 --backend-url http://127.0.0.1:8000 --max-frames 5 --json
 ```
 
-The folders contain ownership notes and placeholders; implementation files must be added by the assigned lead. Do not claim the application is implemented merely because the repository scaffold exists.
+### 4. Fast Deterministic Replay Fallback (Zero PyTorch / LinuxONE Safe)
+```bash
+cd cv-engine
+$env:PYTHONPATH="src"
+py -m sentinel_cv --replay --backend-url http://127.0.0.1:8000 --json
+```
 
 ## Security and repository hygiene
 - Never commit `.env`, API keys, credentials, private keys, or unlicensed/private footage.
