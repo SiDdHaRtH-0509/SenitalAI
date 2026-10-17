@@ -8,8 +8,7 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [x] Implement FastAPI health/event/list/stats/cameras/zones endpoints.
 - [x] Implement SQLite storage, transaction sessions, and duplicate idempotency.
 - [x] Implement deterministic risk engine with explanation reasons and recommended actions.
-- [x] Test backend and publish sample requests (18 automated tests passing in backend/app/tests).
-- [ ] Review/merge lead PRs and run end-to-end tests.
+- [x] Run CV engine and FastAPI end-to-end integration tests (28 automated tests passing across backend and root suites).
 - [ ] Verify submission claims and package final deliverables.
 
 ## Lead 1 — Frontend
@@ -37,7 +36,7 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [x] Implement video reader and configured zone.
 - [x] Implement documented zone-entry logic and temporal confirmation.
 - [x] Add event ID, timestamp, cooldown and deduplication.
-- [x] Send exact payload to backend (BackendClient verified via contract & mocks; live backend unverified).
+- [x] Send exact payload to backend (Live HTTP submission verified against FastAPI server; HTTP 201 created, HTTP 409 duplicate handling).
 - [x] Test failure/replay fallback and document limitations.
 
 
