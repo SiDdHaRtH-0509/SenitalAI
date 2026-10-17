@@ -4,11 +4,11 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 
 ## Overall Lead
 - [ ] Confirm official rules, time window, AI assistance and IBM environment.
-- [ ] Freeze event schema and risk semantics.
-- [ ] Implement FastAPI health/event/list/stats endpoints.
-- [ ] Implement SQLite storage and idempotency.
-- [ ] Implement deterministic risk engine with explanation reasons.
-- [ ] Test backend and publish sample requests.
+- [x] Freeze event schema and risk semantics (canonical status enum, ISO-8601 timestamps, explainable reasons).
+- [x] Implement FastAPI health/event/list/stats/cameras/zones endpoints.
+- [x] Implement SQLite storage, transaction sessions, and duplicate idempotency.
+- [x] Implement deterministic risk engine with explanation reasons and recommended actions.
+- [x] Test backend and publish sample requests (18 automated tests passing in backend/app/tests).
 - [ ] Review/merge lead PRs and run end-to-end tests.
 - [ ] Verify submission claims and package final deliverables.
 
