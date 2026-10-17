@@ -1,7 +1,19 @@
 import React, { useState } from 'react';
 import { X, AlertOctagon, CheckCircle2, Shield, Info, RefreshCw, AlertTriangle } from 'lucide-react';
-import { SecurityEvent, EventStatus } from '../../types';
+import { SecurityEvent, EventStatus, EventEvidence } from '../../types';
 import { StatusBadge } from '../ui/StatusBadge';
+
+const getBoundingBoxDisplay = (evidence?: EventEvidence): string => {
+  if (!evidence) return 'N/A';
+  if (Array.isArray(evidence.bbox) && evidence.bbox.length === 4) {
+    return `[${evidence.bbox.map((v) => (typeof v === 'number' ? v.toFixed(2) : String(v))).join(', ')}]`;
+  }
+  if (evidence.bounding_box && typeof evidence.bounding_box === 'object') {
+    const { x1, y1, x2, y2 } = evidence.bounding_box;
+    return `[${Number(x1).toFixed(2)}, ${Number(y1).toFixed(2)}, ${Number(x2).toFixed(2)}, ${Number(y2).toFixed(2)}]`;
+  }
+  return 'N/A';
+};
 
 interface EventDetailModalProps {
   event: SecurityEvent | null;
@@ -171,7 +183,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
             <div className="detail-row">
               <span className="detail-label">Person Count:</span>
-              <span className="detail-value">{event.person_count ?? event.evidence.person_count ?? 1}</span>
+              <span className="detail-value">{event.person_count ?? event.evidence?.person_count ?? 1}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Detection Confidence:</span>
@@ -179,14 +191,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             </div>
             <div className="detail-row">
               <span className="detail-label">Detection Frame Number:</span>
-              <span className="detail-value">{event.evidence.frame_number}</span>
+              <span className="detail-value">{event.evidence?.frame_number ?? 'N/A'}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Normalized Bounding Box:</span>
+              <span className="detail-label">Bounding Box:</span>
               <span className="detail-value">
-                {event.evidence.bbox ? `[${event.evidence.bbox.map((v) => v.toFixed(2)).join(', ')}]` : 'N/A'}
+                {getBoundingBoxDisplay(event.evidence)}
               </span>
             </div>
+            {(event.evidence?.bottom_center || event.evidence?.reference_point) && (
+              <div className="detail-row">
+                <span className="detail-label">Reference Point:</span>
+                <span className="detail-value">
+                  {`[${(event.evidence.bottom_center || event.evidence.reference_point)!.map((v: unknown) => Number(v).toFixed(2)).join(', ')}]`}
+                </span>
+              </div>
+            )}
             <div className="detail-row">
               <span className="detail-label">Event Timestamp:</span>
               <span className="detail-value">{event.timestamp}</span>

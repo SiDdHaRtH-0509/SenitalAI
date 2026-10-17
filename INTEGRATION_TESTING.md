@@ -75,6 +75,7 @@ Mark a box only after the test is actually performed. Record commit hash, enviro
 | Persistence Across Backend Restart | Localhost (SQLite `sentinel.db`) / branch `integration/cv-backend-e2e` | PASS | Uvicorn process terminated, restarted; `GET /api/events/evt-cam-north-01-zone-restricted-01-e7a264df` returned 200 with full integrity. |
 | Frontend Contract & Real-Time Polling | Node v22.14.0 / React + Vite / branch `integration/cv-backend-e2e` | PASS | 51 automated frontend tests passing; polling and offline state fallback verified. |
 | Cross-Module Automated Integration Suite | Pytest / Python 3.14.2 (`tests/test_e2e_cv_backend.py`) | PASS | 7/7 automated integration tests pass covering replay, real YOLO, duplicate prevention, restart, failure resilience, and disabled flags. |
+| Real Frontend-Backend Integration (Phase 4) | Localhost (`127.0.0.1:8000` & `localhost:3000`) / branch `integration/real-frontend-backend` | PASS | Live React dashboard connected to running FastAPI server; verified real YOLO event retrieval (`evt-cam-north-01-zone-restricted-01-e7a264df`), live KPI stats binding, bounding-box evidence rendering, operator review status update via `PATCH /api/events/{id}/status` from `NEW` to `ACKNOWLEDGED`, SQLite persistence across server restart, and offline fallback recovery. |
 
 ## Test Count Audit & Clarification
 - **CV Engine Unit & Integration Tests:** 126 unique tests (`py -m unittest discover tests` in `cv-engine/`)

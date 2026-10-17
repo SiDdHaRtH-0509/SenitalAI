@@ -211,6 +211,7 @@ export class PollingEventStreamService implements EventStreamService {
         events,
         stats,
         timestamp: nowIso,
+        isLive: eventsResponse.isLive,
         message: eventsResponse.isLive
           ? 'Live telemetry retrieved.'
           : 'Backend unreachable. Showing demonstration audit fixtures.',

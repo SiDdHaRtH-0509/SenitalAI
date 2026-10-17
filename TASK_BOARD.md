@@ -28,6 +28,7 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [x] Implement WCAG keyboard accessibility, skip-to-content anchor, and universal focus indicators.
 - [x] Achieve 51 passing automated tests across contract, real-time, and QA suites (0 failures).
 - [x] Produce comprehensive demonstration script, technical handover guide (`leads/lead-1-frontend/HANDOVER.md`), and updated documentation.
+- [x] Complete Phase 4 real frontend-backend integration: connect React dashboard to live FastAPI backend at `http://127.0.0.1:8000`, verify real YOLO event display (`evt-cam-north-01-zone-restricted-01-e7a264df`), live KPI stats binding, dual bounding-box evidence rendering, operator review status update via `PATCH /api/events/{id}/status` from `NEW` to `ACKNOWLEDGED`, SQLite persistence across server restart, and offline fallback recovery.
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
