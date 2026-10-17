@@ -223,6 +223,14 @@ class TestCVConfig(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             CVConfig(base_timestamp="2026-10-17 09:30:00")
 
+    def test_from_env_with_zone_vertices(self) -> None:
+        """Verify CV_ZONE_VERTICES environment variable is parsed into a tuple of points."""
+        env_vars = {"CV_ZONE_VERTICES": "[[10.0, 20.0], [30.0, 40.0], [50.0, 60.0]]"}
+        with patch.dict(os.environ, env_vars, clear=False):
+            cfg = CVConfig.from_env()
+            self.assertEqual(cfg.zone_vertices, ((10.0, 20.0), (30.0, 40.0), (50.0, 60.0)))
+
+
 
 
 class TestLoggingConfig(unittest.TestCase):

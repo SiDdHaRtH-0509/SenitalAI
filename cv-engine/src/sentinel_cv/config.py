@@ -282,6 +282,20 @@ class CVConfig:
         raw_retries = os.getenv("CV_API_MAX_RETRIES")
         parsed_retries = int(raw_retries) if raw_retries and raw_retries.strip() else 2
 
+        raw_vertices = os.getenv("CV_ZONE_VERTICES")
+        parsed_vertices = None
+        if raw_vertices and raw_vertices.strip():
+            try:
+                v_data = json.loads(raw_vertices)
+                parsed_vertices = tuple((float(pt[0]), float(pt[1])) for pt in v_data)
+            except Exception:
+                try:
+                    import ast
+                    v_data = ast.literal_eval(raw_vertices)
+                    parsed_vertices = tuple((float(pt[0]), float(pt[1])) for pt in v_data)
+                except Exception:
+                    parsed_vertices = None
+
         return cls(
             input_source_type=os.getenv("CV_INPUT_SOURCE_TYPE", "file"),
             video_source=os.getenv("CV_VIDEO_SOURCE", "sample-data/demo.mp4"),
@@ -295,6 +309,7 @@ class CVConfig:
             confidence_threshold=parsed_conf,
             zone_id=os.getenv("CV_ZONE_ID", "zone-restricted-01"),
             zone_name=os.getenv("CV_ZONE_NAME", "Restricted Zone 01"),
+            zone_vertices=parsed_vertices,
             zones_json=os.getenv("CV_ZONES_JSON") or None,
             reference_point_strategy=os.getenv("CV_REFERENCE_POINT_STRATEGY", "bottom_center"),
             deduplication_cooldown_sec=parsed_cooldown,
