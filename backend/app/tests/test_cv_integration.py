@@ -318,3 +318,114 @@ class TestCVBackendIntegration:
         # DB has 0 records
         assert test_db_session.query(EventModel).count() == 0
 
+    def test_real_yolo_stream_pipeline_to_backend(self, client: TestClient, test_db_session: Session) -> None:
+        """Verify real YOLO pipeline processes actual video frames, detects real persons,
+
+        evaluates zone incursions, and submits structured events to the FastAPI backend.
+        """
+        repo_root = Path(__file__).resolve().parents[3]
+        weights = None
+        for cand in (
+            repo_root / "yolov8n.pt",
+            repo_root / "cv-engine" / "yolov8n.pt",
+            Path("yolov8n.pt").resolve(),
+        ):
+            if cand.exists():
+                weights = str(cand)
+                break
+        video_path = repo_root / "cv-engine" / "sample-data" / "real_person_stream.mp4"
+        if not weights or not video_path.exists():
+            pytest.skip("YOLO weights or test video not available.")
+
+        transport = make_testclient_transport(client)
+        config = CVConfig(
+            input_source_type="file",
+            video_source=str(video_path),
+            model_type="yolo",
+            model_path=weights,
+            camera_id="cam-north-01",
+            zone_id="zone-restricted-01",
+            replay_mode=False,
+            events_enabled=True,
+            temporal_confirmation_frames=1,
+            deduplication_cooldown_sec=5.0,
+            backend_url="http://testserver",
+        )
+
+        pipeline = CVPipeline.from_config(config=config, auto_init=True)
+        pipeline.backend_client._transport = transport
+
+        # Process 3 frames
+        results = list(pipeline.process_stream(max_frames=3))
+        assert len(results) == 3
+
+        # Check real YOLO detections
+        total_detections = sum(len(r.detections) for r in results)
+        assert total_detections >= 1, "Real YOLO must detect persons in the test video"
+
+        # Check that events were emitted and submitted
+        all_submissions = [sub for r in results for sub in r.event_submissions]
+        assert len(all_submissions) >= 1
+        first_sub = all_submissions[0]
+        assert first_sub.success is True
+        assert first_sub.status_code == 201
+
+        # Verify event in SQLite backend via TestClient
+        resp = client.get(f"/api/events/{first_sub.event_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["event_id"] == first_sub.event_id
+        assert data["camera_id"] == "cam-north-01"
+        assert data["event_type"] == "RESTRICTED_ZONE_ENTRY"
+        assert data["severity"] == "HIGH"
+        assert data["confidence"] >= 0.50
+        assert data["evidence"]["class_name"] == "person"
+        assert "bounding_box" in data["evidence"]
+        assert "reference_point" in data["evidence"]
+        assert data["risk_score"] >= 60
+
+    def test_real_yolo_empty_video_submits_zero_events(self, client: TestClient, test_db_session: Session) -> None:
+        """Verify real YOLO on blank/text video produces 0 detections and submits 0 events to backend."""
+        repo_root = Path(__file__).resolve().parents[3]
+        weights = None
+        for cand in (
+            repo_root / "yolov8n.pt",
+            repo_root / "cv-engine" / "yolov8n.pt",
+            Path("yolov8n.pt").resolve(),
+        ):
+            if cand.exists():
+                weights = str(cand)
+                break
+        video_path = repo_root / "cv-engine" / "sample-data" / "synthetic_border_test.mp4"
+        if not weights or not video_path.exists():
+            pytest.skip("YOLO weights or test video not available.")
+
+        transport = make_testclient_transport(client)
+        config = CVConfig(
+            input_source_type="file",
+            video_source=str(video_path),
+            model_type="yolo",
+            model_path=weights,
+            camera_id="cam-north-01",
+            zone_id="zone-restricted-01",
+            replay_mode=False,
+            events_enabled=True,
+            temporal_confirmation_frames=1,
+            deduplication_cooldown_sec=5.0,
+            backend_url="http://testserver",
+        )
+
+        pipeline = CVPipeline.from_config(config=config, auto_init=True)
+        pipeline.backend_client._transport = transport
+
+        results = list(pipeline.process_stream(max_frames=3))
+        assert len(results) == 3
+
+        # Must have 0 detections and 0 events
+        total_detections = sum(len(r.detections) for r in results)
+        assert total_detections == 0
+        total_events = sum(len(r.events) for r in results)
+        assert total_events == 0
+        assert test_db_session.query(EventModel).count() == 0
+
+

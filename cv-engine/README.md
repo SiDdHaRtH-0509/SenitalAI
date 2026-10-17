@@ -308,7 +308,7 @@ python -m sentinel_cv --replay --per-frame-json
 
 ## 10. Running Automated Tests
 
-Run the complete test suite (122 tests) using Python's standard `unittest` runner:
+Run the complete test suite (126 tests) using Python's standard `unittest` runner:
 
 ```bash
 # Windows PowerShell
@@ -318,10 +318,10 @@ $env:PYTHONPATH="src"; python -m unittest discover -v -s tests -p "test_*.py"
 PYTHONPATH=src python3 -m unittest discover -v -s tests -p "test_*.py"
 ```
 
-All 122 unit and integration tests run deterministically without internet access, physical cameras, or a live backend server.
+All 126 unit and integration tests run deterministically, including genuine YOLO inference tests (`TestRealYOLOInference`) when `ultralytics` and weights are detected.
 
 ### Running End-to-End Tests with FastAPI Backend:
-To run the cross-module end-to-end integration test suite connecting `sentinel_cv` with the FastAPI backend:
+To run the cross-module end-to-end integration test suite connecting `sentinel_cv` with the FastAPI backend (covering both deterministic replay and real YOLO inference):
 
 ```bash
 # Windows PowerShell from repo root
