@@ -128,7 +128,10 @@ The **canonical status enum** is strictly:
 **Accepted Aliases:** For backward compatibility with legacy draft interfaces, the API normalizes:
 - `UNREVIEWED` ➔ `NEW`
 - `INVESTIGATING` ➔ `ACKNOWLEDGED`
+- `REVIEWED` ➔ `ACKNOWLEDGED`
+- `RESOLVED` ➔ `RESOLVED`
 - `FALSE_POSITIVE` ➔ `RESOLVED`
+- `DISMISSED` ➔ `RESOLVED`
 
 Invalid status strings return HTTP 422 Unprocessable Content.
 
@@ -214,7 +217,13 @@ Response: `{"total": int, "created": int, "duplicates": int, "errors": [], "even
 - `confidence`: Finite float strictly in $[0.0, 1.0]$.
 - `zone_id`: String identifier or null.
 - `description`: Concise factual text.
-- `evidence`: JSON object containing detector metadata (`class_name`, `bbox`, `frame_number`, `track_id`, etc.).
+- `evidence`: JSON object containing detector telemetry metadata. Supported formats:
+  - `bounding_box`: Object with `{ x1: float, y1: float, x2: float, y2: float }` (native CV engine and backend format)
+  - `bbox`: 4-element array `[x1, y1, x2, y2]` (client coordinate format)
+  - `reference_point` / `bottom_center`: 2-element array `[x, y]` representing foot ground-contact coordinate
+  - `frame_number`: integer frame index
+  - `track_id`: optional integer tracker ID or null
+  - `class_name`: detection classification (`"person"`)
 - `risk_score`: Heuristic integer in $[0, 100]$, computed deterministically by backend.
 - `risk_level`: Categorical risk classification (`LOW|MEDIUM|HIGH|CRITICAL`).
 - `reasons`: Array of human-readable explanation strings.

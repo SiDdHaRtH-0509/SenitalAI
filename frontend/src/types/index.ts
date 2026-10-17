@@ -7,13 +7,23 @@ export type SeverityLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type EventStatus = 'NEW' | 'ACKNOWLEDGED' | 'RESOLVED';
 
+export interface BoundingBoxObject {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 export interface EventEvidence {
-  class_name: string;
-  track_id: number | null;
-  frame_number: number;
+  class_name?: string;
+  track_id?: number | null;
+  frame_number?: number;
   person_count?: number;
   bbox?: [number, number, number, number];
+  bounding_box?: BoundingBoxObject;
   reference_point?: [number, number];
+  bottom_center?: [number, number];
+  [key: string]: unknown;
 }
 
 export interface SecurityEvent {
@@ -78,6 +88,7 @@ export interface StreamEventPayload {
   stats?: DashboardStatistics;
   timestamp: string;
   message?: string;
+  isLive?: boolean;
 }
 
 // Small Reusable Transport Interface per Section 4

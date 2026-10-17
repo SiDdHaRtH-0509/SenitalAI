@@ -168,5 +168,107 @@ class TestCreateDetectorFactory(unittest.TestCase):
             create_detector(cfg)
 
 
+class TestRealYOLOInference(unittest.TestCase):
+    """Integration test suite for genuine YOLOv8 person detector execution.
+
+    Distinguishes genuine neural network inference from mock/replay canned outputs.
+    Tests model loading, real person detection, empty frame behavior, and zone analysis.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import os
+        cls.ultralytics_available = False
+        cls.weights_path = None
+
+        try:
+            import ultralytics
+            cls.ultralytics_available = True
+            # Check potential locations for weights
+            for candidate in ("yolov8n.pt", "cv-engine/yolov8n.pt", "../yolov8n.pt"):
+                if os.path.exists(candidate):
+                    cls.weights_path = os.path.abspath(candidate)
+                    break
+            cls.bus_img_path = os.path.join(os.path.dirname(ultralytics.__file__), "assets", "bus.jpg")
+        except ImportError:
+            pass
+
+    def setUp(self) -> None:
+        if not self.ultralytics_available or not self.weights_path:
+            self.skipTest("Ultralytics or yolov8n.pt weights not available in this environment.")
+
+    def test_real_yolo_model_loading(self) -> None:
+        """Verify real YOLO model loads from disk and resolves class names dictionary."""
+        detector = YOLOPersonDetector(model_name_or_path=self.weights_path, confidence_threshold=0.50)
+        self.assertFalse(detector.is_ready())
+        detector.load_model()
+        self.assertTrue(detector.is_ready())
+        self.assertEqual(detector.person_class_id, 0)
+        self.assertEqual(detector.person_class_name, "person")
+
+    def test_real_yolo_detects_person_in_image(self) -> None:
+        """Verify real YOLO inference detects real persons with valid bboxes and confidence."""
+        import cv2
+        frame = cv2.imread(self.bus_img_path)
+        self.assertIsNotNone(frame, "Failed to read test image bus.jpg")
+        h, w = frame.shape[:2]
+        meta = FrameMetadata(frame_index=0, timestamp=0.0, width=w, height=h)
+
+        detector = YOLOPersonDetector(model_name_or_path=self.weights_path, confidence_threshold=0.50)
+        detector.load_model()
+        detections = detector.detect(frame, meta)
+
+        self.assertGreaterEqual(len(detections), 1, "Real YOLO should detect at least 1 person in bus.jpg")
+        for det in detections:
+            self.assertEqual(det.class_name, "person")
+            self.assertGreaterEqual(det.confidence, 0.50)
+            self.assertLessEqual(det.confidence, 1.0)
+            # Verify coordinates are valid and bounded
+            self.assertGreaterEqual(det.bbox.x1, 0.0)
+            self.assertGreaterEqual(det.bbox.y1, 0.0)
+            self.assertLessEqual(det.bbox.x2, float(w))
+            self.assertLessEqual(det.bbox.y2, float(h))
+            self.assertLess(det.bbox.x1, det.bbox.x2)
+            self.assertLess(det.bbox.y1, det.bbox.y2)
+
+    def test_real_yolo_blank_frame_returns_zero_detections(self) -> None:
+        """Verify real YOLO does NOT invent detections on a blank frame (distinguishing from mock)."""
+        import numpy as np
+        blank_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        meta = FrameMetadata(frame_index=0, timestamp=0.0, width=640, height=480)
+
+        detector = YOLOPersonDetector(model_name_or_path=self.weights_path, confidence_threshold=0.50)
+        detector.load_model()
+        detections = detector.detect(blank_frame, meta)
+
+        self.assertEqual(len(detections), 0, "Real YOLO must return 0 detections on blank frame")
+
+    def test_real_yolo_zone_incursion_and_rejection(self) -> None:
+        """Verify real detections connected to ZoneAnalyzer distinguish zone incursion from outside persons."""
+        import cv2
+        from sentinel_cv.zone import ZoneAnalyzer
+        from sentinel_cv.config import CVConfig
+
+        frame = cv2.resize(cv2.imread(self.bus_img_path), (1280, 720))
+        meta = FrameMetadata(frame_index=0, timestamp=0.0, width=1280, height=720)
+
+        cfg = CVConfig()
+        analyzer = ZoneAnalyzer(zones=cfg.get_configured_zones(), reference_point_strategy="bottom_center")
+        detector = YOLOPersonDetector(model_name_or_path=self.weights_path, confidence_threshold=0.50)
+        detector.load_model()
+
+        detections = detector.detect(frame, meta)
+        results = analyzer.evaluate(detections, meta)
+
+        self.assertEqual(len(results), len(detections))
+        inside_count = sum(1 for r in results if r.is_inside)
+        outside_count = sum(1 for r in results if not r.is_inside)
+
+        # In 1280x720 resized bus.jpg, exactly 1 person is inside the central zone and 3 are outside
+        self.assertGreaterEqual(inside_count, 1, "At least one person should be inside central zone")
+        self.assertGreaterEqual(outside_count, 1, "At least one person should be outside central zone")
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -63,6 +63,16 @@ def test_status_aliases_backward_compatibility(client: TestClient):
     assert r3.status_code == 200
     assert r3.json()["status"] == "RESOLVED"
 
+    # REVIEWED -> ACKNOWLEDGED
+    r4 = client.patch("/api/events/evt-status-02/status", json={"status": "REVIEWED"})
+    assert r4.status_code == 200
+    assert r4.json()["status"] == "ACKNOWLEDGED"
+
+    # DISMISSED -> RESOLVED
+    r5 = client.patch("/api/events/evt-status-02/status", json={"status": "DISMISSED"})
+    assert r5.status_code == 200
+    assert r5.json()["status"] == "RESOLVED"
+
 
 def test_invalid_status_rejected(client: TestClient):
     """Verify unsupported status strings are rejected with 422."""

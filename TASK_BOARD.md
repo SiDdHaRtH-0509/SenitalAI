@@ -28,22 +28,22 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [x] Implement WCAG keyboard accessibility, skip-to-content anchor, and universal focus indicators.
 - [x] Achieve 51 passing automated tests across contract, real-time, and QA suites (0 failures).
 - [x] Produce comprehensive demonstration script, technical handover guide (`leads/lead-1-frontend/HANDOVER.md`), and updated documentation.
+- [x] Complete Phase 4 real frontend-backend integration: connect React dashboard to live FastAPI backend at `http://127.0.0.1:8000`, verify real YOLO event display (`evt-cam-north-01-zone-restricted-01-e7a264df`), live KPI stats binding, dual bounding-box evidence rendering, operator review status update via `PATCH /api/events/{id}/status` from `NEW` to `ACKNOWLEDGED`, SQLite persistence across server restart, and offline fallback recovery.
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
-- [ ] Confirm sample video authorization and format (synthetic video verified; awaiting final datathon sample).
-- [x] Test OpenCV and selected pretrained detector in available environment.
+- [ ] Confirm sample video authorization and format (synthetic and real sample streams verified; awaiting final datathon sample).
+- [x] Test OpenCV and selected pretrained detector in available environment (YOLOv8n CPU verified with real person detections).
 - [x] Implement video reader and configured zone.
 - [x] Implement documented zone-entry logic and temporal confirmation.
 - [x] Add event ID, timestamp, cooldown and deduplication.
-- [x] Send exact payload to backend (Live HTTP submission verified against FastAPI server; HTTP 201 created, HTTP 409 duplicate handling).
+- [x] Send exact payload to backend (Live HTTP submission verified against FastAPI server; both replay and genuine YOLO events produce HTTP 201 created, HTTP 409 duplicate handling).
 - [x] Test failure/replay fallback and document limitations.
-
 
 ## Lead 3 — LinuxONE / Environment
 - [ ] Obtain official environment access and deployment requirements.
 - [ ] Record `uname -m`, OS, Python, Node, Docker/Podman availability as applicable.
-- [ ] Check architecture compatibility for all native dependencies and model runtimes.
+- [x] Check architecture compatibility for all native dependencies and model runtimes (s390x PyTorch/Ultralytics wheel blocker identified; distributed edge-inference architecture documented).
 - [ ] Verify target registry images support `s390x` or use documented alternative.
 - [ ] Prepare minimal deployment/run procedure based on actual access method.
 - [ ] Deploy or test the required component on LinuxONE.

@@ -135,14 +135,14 @@ py -m pytest app/tests -v
 PYTHONPATH=. pytest app/tests -v
 ```
 
-### Test Suite Coverage (23 Automated Tests):
+### Test Suite Coverage (25 Automated Tests):
 1. `test_health.py`: Liveness probe (`GET /api/health`) and root endpoint.
 2. `test_stats.py`: Aggregate statistics on empty and populated database (`GET /api/stats`).
 3. `test_events.py`: Event creation, retrieval, filtering, pagination, 404 handling, duplicate prevention (HTTP 409), invalid payload rejection (HTTP 422), and batch ingestion.
 4. `test_status.py`: Operator review workflow (`PATCH /api/events/{id}/status`), valid status transitions, notes appending, and alias normalization.
 5. `test_cameras_zones.py`: Camera device registry and restricted zone polygon endpoints.
 6. `test_persistence.py`: Validates database persistence and recovery across full application restarts.
-7. `test_cv_integration.py`: Complete end-to-end integration between CVPipeline and FastAPI backend (real event emission, schema conformance, risk computation, duplicate handling, DB restart recovery, and backend network failure resilience).
+7. `test_cv_integration.py`: 7 end-to-end integration tests between CVPipeline and FastAPI backend covering deterministic replay mode, genuine YOLOv8 neural network inference on video frames, blank-frame honest negative verification, schema conformance, risk computation, duplicate handling, DB restart recovery, and backend network failure resilience.
 
 ---
 

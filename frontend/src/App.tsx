@@ -94,11 +94,20 @@ export const App: React.FC = () => {
 
   const highlightTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  // Load client preferences on mount
+  // Load client preferences and camera registry on mount
   useEffect(() => {
     const loaded = loadClientSettings();
     setSettings(loaded);
     globalEventStream.setPollingIntervalSec(loaded.auto_refresh_interval);
+    fetchCameras()
+      .then((res) => {
+        if (res.data && res.data.length > 0) {
+          setCameras(res.data);
+        }
+      })
+      .catch(() => {
+        // Fallback already handled inside fetchCameras
+      });
   }, []);
 
   // Listen to browser back/forward buttons
@@ -218,7 +227,7 @@ export const App: React.FC = () => {
 
       if (payload.type === 'EVENT_BATCH' && payload.events) {
         setEvents(payload.events);
-        setIsLive(payload.events.length > 0 && !payload.events[0].is_demo);
+        setIsLive(payload.isLive ?? (payload.events.length > 0 && !payload.events[0].is_demo));
         if (payload.stats) {
           setStats(payload.stats);
         }
