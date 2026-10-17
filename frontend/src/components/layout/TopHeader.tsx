@@ -1,12 +1,31 @@
-import React, { useState } from 'react';
-import { Search, Bell, Menu, ShieldAlert, CheckCircle2, AlertTriangle, X } from 'lucide-react';
-import { NavigationPage } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Search,
+  Bell,
+  Menu,
+  ShieldAlert,
+  CheckCircle2,
+  X,
+  RefreshCw,
+  Check,
+} from 'lucide-react';
+import { NavigationPage, ConnectionState, SecurityNotification } from '../../types';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface TopHeaderProps {
   activePage: NavigationPage;
   onOpenMobileMenu: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  connectionState: ConnectionState;
+  isLive: boolean;
+  lastRefreshTime: string | null;
+  notifications: SecurityNotification[];
+  onMarkNotificationAsRead: (id: string) => void;
+  onMarkAllNotificationsAsRead: () => void;
+  onSelectEventById: (eventId: string) => void;
+  onManualRefresh: () => Promise<void>;
+  isRefreshing: boolean;
 }
 
 const PAGE_TITLES: Record<NavigationPage, { title: string; subtitle: string }> = {
@@ -49,12 +68,101 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenMobileMenu,
   searchQuery,
   onSearchChange,
+  connectionState,
+  isLive,
+  lastRefreshTime,
+  notifications,
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onSelectEventById,
+  onManualRefresh,
+  isRefreshing,
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const bellButtonRef = useRef<HTMLButtonElement>(null);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   const pageMeta = PAGE_TITLES[activePage] || {
     title: 'Security Operations',
     subtitle: 'Border Surveillance Command Platform',
   };
+
+  // Close notifications on outside click or Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showNotifications) {
+        setShowNotifications(false);
+        bellButtonRef.current?.focus();
+      }
+    };
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node) &&
+        bellButtonRef.current &&
+        !bellButtonRef.current.contains(e.target as Node)
+      ) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showNotifications]);
+
+  // Map ConnectionState to human-readable label and CSS class
+  const getConnectionMeta = (state: ConnectionState) => {
+    switch (state) {
+      case 'CONNECTED':
+        return {
+          label: 'Telemetry Live',
+          className: 'connected',
+          title: `FastAPI backend active on port 8000. Last update: ${lastRefreshTime ? new Date(lastRefreshTime).toLocaleTimeString() : 'now'}`,
+        };
+      case 'CONNECTING':
+        return {
+          label: 'Connecting...',
+          className: 'connecting',
+          title: 'Establishing link to backend API...',
+        };
+      case 'RECONNECTING':
+        return {
+          label: 'Reconnecting...',
+          className: 'reconnecting',
+          title: 'Connection interrupted. Re-probing backend...',
+        };
+      case 'DEGRADED':
+        return {
+          label: 'Degraded',
+          className: 'degraded',
+          title: 'Subsystem latency or partial error reported.',
+        };
+      case 'DISCONNECTED':
+        return {
+          label: 'Backend Offline',
+          className: 'disconnected',
+          title: 'Backend unreachable. Operating in offline demonstration mode.',
+        };
+      case 'INTEGRATION_PENDING':
+      default:
+        return {
+          label: 'Integration Pending',
+          className: 'integration-pending',
+          title: 'FastAPI service offline. Operating in demonstration mode per datathon roadmap.',
+        };
+    }
+  };
+
+  const connMeta = getConnectionMeta(connectionState);
 
   return (
     <header className="app-header" role="banner">
@@ -75,7 +183,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Search, Status, Notifications, Demo Operator */}
+      {/* Right: Search, Status, Refresh, Notifications, Profile */}
       <div className="header-right">
         {/* Search Input Affordance */}
         <div className="header-search">
@@ -90,75 +198,216 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           />
         </div>
 
-        {/* System Health Status Indicator */}
-        <div className="system-status-pill" title="Backend integration pending deployment">
+        {/* Manual Refresh Affordance */}
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onManualRefresh}
+          disabled={isRefreshing}
+          title={isRefreshing ? 'Refreshing telemetry...' : 'Manually poll backend telemetry'}
+          aria-label="Refresh telemetry data"
+          style={{ padding: '6px' }}
+        >
+          <RefreshCw size={14} className={isRefreshing ? 'spin-icon' : ''} />
+        </button>
+
+        {/* Global Connection Status Indicator Pill per Section 6 */}
+        <div
+          className={`system-status-pill ${connMeta.className}`}
+          title={connMeta.title}
+          role="status"
+          aria-live="polite"
+        >
           <span className="status-pulse-dot" />
-          <span>Integration Pending</span>
+          <span>{connMeta.label}</span>
+          {!isLive && (
+            <span
+              style={{
+                fontSize: '9px',
+                opacity: 0.8,
+                borderLeft: '1px solid rgba(255,255,255,0.2)',
+                paddingLeft: '4px',
+                marginLeft: '2px',
+              }}
+            >
+              DEMO
+            </span>
+          )}
         </div>
 
-        {/* Notifications Icon & Popover */}
+        {/* Notifications Icon & Popover per Section 7 */}
         <div className="notification-container">
           <button
+            ref={bellButtonRef}
             type="button"
             className="icon-btn"
             onClick={() => setShowNotifications(!showNotifications)}
-            aria-label="System notifications"
+            aria-label={`${unreadCount} unread security notifications`}
             aria-expanded={showNotifications}
+            aria-haspopup="dialog"
           >
             <Bell size={18} />
-            <span className="notification-badge" />
+            {unreadCount > 0 && (
+              <span className="notification-badge" aria-hidden="true">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {showNotifications && (
-            <div className="notifications-popover" role="dialog" aria-label="Notifications panel">
+            <div
+              ref={popoverRef}
+              className="notifications-popover"
+              role="dialog"
+              aria-label="Security incident notifications"
+            >
               <div className="popover-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ShieldAlert size={15} style={{ color: 'var(--color-warning)' }} />
-                  <h4>System Notifications (3)</h4>
+                  <ShieldAlert size={15} style={{ color: 'var(--color-critical)' }} />
+                  <h4>Security Alerts ({notifications.length})</h4>
+                  {unreadCount > 0 && (
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        backgroundColor: 'var(--color-critical-bg)',
+                        color: 'var(--color-critical)',
+                        padding: '1px 5px',
+                        borderRadius: 'var(--radius-xs)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {unreadCount} New
+                    </span>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  style={{ background: 'transparent', color: 'var(--color-text-dim)', padding: '2px' }}
-                  onClick={() => setShowNotifications(false)}
-                  aria-label="Close notifications"
-                >
-                  <X size={14} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--color-accent-blue)',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                      }}
+                      onClick={onMarkAllNotificationsAsRead}
+                      title="Mark all notifications as read"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--color-text-dim)',
+                      padding: '2px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setShowNotifications(false)}
+                    aria-label="Close notifications"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
 
-              <div className="notification-list">
-                <div className="notification-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <AlertTriangle size={13} style={{ color: 'var(--color-critical)' }} />
-                    <div className="notification-item-title">CRITICAL Incursion Alert</div>
+              <div className="notification-list" role="feed" aria-busy="false">
+                {notifications.length === 0 ? (
+                  <div
+                    style={{
+                      padding: '24px 16px',
+                      textAlign: 'center',
+                      color: 'var(--color-text-dim)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <CheckCircle2 size={24} style={{ color: 'var(--color-success)', marginBottom: '8px' }} />
+                    <p style={{ margin: 0, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                      No Security Alerts
+                    </p>
+                    <span style={{ fontSize: '11px' }}>
+                      All perimeter sectors are currently calm.
+                    </span>
                   </div>
-                  <p style={{ color: 'var(--color-text-secondary)', margin: '2px 0' }}>
-                    Sector Alpha North Ridge (cam-north-01) demo entry logged.
-                  </p>
-                  <div className="notification-item-time">09:30:00 UTC • Demo Fixture</div>
-                </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={`notification-item ${notif.read ? 'read' : 'unread'}`}
+                      onClick={() => {
+                        onSelectEventById(notif.event_id);
+                        onMarkNotificationAsRead(notif.id);
+                        setShowNotifications(false);
+                      }}
+                      role="article"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          onSelectEventById(notif.event_id);
+                          onMarkNotificationAsRead(notif.id);
+                          setShowNotifications(false);
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <StatusBadge type="risk" value={notif.risk_level || notif.severity} />
+                          <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            {notif.event_type}
+                          </span>
+                        </div>
+                        {!notif.read && (
+                          <button
+                            type="button"
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--color-text-dim)',
+                              padding: '2px',
+                              cursor: 'pointer',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onMarkNotificationAsRead(notif.id);
+                            }}
+                            title="Mark as read"
+                            aria-label={`Mark notification ${notif.id} as read`}
+                          >
+                            <Check size={12} />
+                          </button>
+                        )}
+                      </div>
 
-                <div className="notification-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={13} style={{ color: 'var(--color-success)' }} />
-                    <div className="notification-item-title">CV Engine Standalone Ready</div>
-                  </div>
-                  <p style={{ color: 'var(--color-text-secondary)', margin: '2px 0' }}>
-                    All 122 CV tests passed. Replay & YOLOv8n inference operational.
-                  </p>
-                  <div className="notification-item-time">09:15:00 UTC • Localhost Node</div>
-                </div>
+                      <p style={{ color: 'var(--color-text-secondary)', margin: '4px 0', fontSize: '11px' }}>
+                        {notif.message}
+                      </p>
 
-                <div className="notification-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <AlertTriangle size={13} style={{ color: 'var(--color-warning)' }} />
-                    <div className="notification-item-title">Backend API Offline</div>
-                  </div>
-                  <p style={{ color: 'var(--color-text-secondary)', margin: '2px 0' }}>
-                    Awaiting FastAPI service launch on http://localhost:8000.
-                  </p>
-                  <div className="notification-item-time">Active • Fallback Mode</div>
-                </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginTop: '4px',
+                          fontSize: '10px',
+                          color: 'var(--color-text-dim)',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        <span>
+                          {new Date(notif.timestamp).toLocaleTimeString()} UTC
+                          {notif.is_demo ? ' • DEMO' : ' • LIVE'}
+                        </span>
+                        <span style={{ color: 'var(--color-accent-blue)', textDecoration: 'underline' }}>
+                          View Details &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}

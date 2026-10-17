@@ -11,6 +11,7 @@ import {
   DashboardStatistics,
   SystemHealthState,
   CameraInfo,
+  EventStatus,
 } from '../types';
 
 interface OverviewPageProps {
@@ -21,6 +22,8 @@ interface OverviewPageProps {
   isLive: boolean;
   onRefresh: () => Promise<void>;
   searchFilter: string;
+  highlightedEventIds?: Set<string>;
+  onStatusChange?: (eventId: string, newStatus: EventStatus) => Promise<{ success: boolean; message: string; isLive: boolean }>;
 }
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({
@@ -31,6 +34,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   isLive,
   onRefresh,
   searchFilter,
+  highlightedEventIds,
+  onStatusChange,
 }) => {
   const [selectedEvent, setSelectedEvent] = useState<SecurityEvent | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -120,19 +125,17 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         isLive={isLive}
         onSelectEvent={(evt) => setSelectedEvent(evt)}
         searchFilter={searchFilter}
+        highlightedEventIds={highlightedEventIds}
       />
 
       {/* Row 3: Activity Trends Placeholder */}
       <ActivitySummary />
 
-      {/* Event Details Inspection Modal */}
+      {/* Event Details Inspection Modal with Operator Status Workflow */}
       <EventDetailModal
         event={selectedEvent}
         onClose={() => setSelectedEvent(null)}
-        onAcknowledge={(eventId) => {
-          alert(`Acknowledgement simulated locally for ${eventId}. Live status persistence requires FastAPI backend service.`);
-          setSelectedEvent(null);
-        }}
+        onStatusChange={onStatusChange}
       />
     </div>
   );

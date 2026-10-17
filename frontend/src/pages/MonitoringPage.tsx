@@ -166,7 +166,22 @@ export const MonitoringPage: React.FC<MonitoringPageProps> = ({
                     ID: {cam.camera_id} • {cam.location}
                   </span>
                 </div>
-                <StatusBadge type="status" value={cam.status} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                  <StatusBadge type="status" value={cam.status} />
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                      color: 'var(--color-warning)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      padding: '1px 5px',
+                      borderRadius: 'var(--radius-xs)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cam.status === 'ONLINE' ? 'STREAM PENDING' : 'DISCONNECTED'}
+                  </span>
+                </div>
               </div>
 
               {/* Video Feed Area (Truthful Disconnected Wireframe) */}

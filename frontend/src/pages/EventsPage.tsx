@@ -6,7 +6,7 @@ import {
   ShieldAlert,
   Info,
 } from 'lucide-react';
-import { SecurityEvent } from '../types';
+import { SecurityEvent, EventStatus } from '../types';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EventDetailModal } from '../components/dashboard/EventDetailModal';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -16,6 +16,8 @@ interface EventsPageProps {
   isLive: boolean;
   onRefresh: () => Promise<void>;
   initialSearchFilter?: string;
+  highlightedEventIds?: Set<string>;
+  onStatusChange?: (eventId: string, newStatus: EventStatus) => Promise<{ success: boolean; message: string; isLive: boolean }>;
 }
 
 type SortField = 'timestamp' | 'risk_score' | 'confidence';
@@ -26,6 +28,8 @@ export const EventsPage: React.FC<EventsPageProps> = ({
   isLive,
   onRefresh,
   initialSearchFilter = '',
+  highlightedEventIds,
+  onStatusChange,
 }) => {
   const [search, setSearch] = useState(initialSearchFilter);
   const [selectedRisk, setSelectedRisk] = useState<string>('ALL');
@@ -303,7 +307,11 @@ export const EventsPage: React.FC<EventsPageProps> = ({
               </thead>
               <tbody>
                 {filteredAndSortedEvents.map((evt) => (
-                  <tr key={evt.event_id} onClick={() => setSelectedEvent(evt)}>
+                  <tr
+                    key={evt.event_id}
+                    className={highlightedEventIds?.has(evt.event_id) ? 'event-row-new' : ''}
+                    onClick={() => setSelectedEvent(evt)}
+                  >
                     <td className="event-id-cell">
                       <span>{evt.event_id}</span>
                       {evt.is_demo && (
@@ -372,10 +380,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({
       <EventDetailModal
         event={selectedEvent}
         onClose={() => setSelectedEvent(null)}
-        onAcknowledge={(eventId) => {
-          alert(`Status update simulated locally for ${eventId}. Live persistence requires FastAPI backend service.`);
-          setSelectedEvent(null);
-        }}
+        onStatusChange={onStatusChange}
       />
     </div>
   );

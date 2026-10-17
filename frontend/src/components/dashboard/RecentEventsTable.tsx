@@ -8,6 +8,7 @@ interface RecentEventsTableProps {
   isLive: boolean;
   onSelectEvent: (event: SecurityEvent) => void;
   searchFilter: string;
+  highlightedEventIds?: Set<string>;
 }
 
 export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
@@ -15,6 +16,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   isLive,
   onSelectEvent,
   searchFilter,
+  highlightedEventIds,
 }) => {
   const filteredEvents = events.filter((evt) => {
     if (!searchFilter.trim()) return true;
@@ -83,7 +85,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               </tr>
             ) : (
               filteredEvents.map((evt) => (
-                <tr key={evt.event_id} onClick={() => onSelectEvent(evt)}>
+                <tr
+                  key={evt.event_id}
+                  className={highlightedEventIds?.has(evt.event_id) ? 'event-row-new' : ''}
+                  onClick={() => onSelectEvent(evt)}
+                >
                   <td className="event-id-cell">
                     <span>{evt.event_id}</span>
                     {evt.is_demo && (

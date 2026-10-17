@@ -25,7 +25,7 @@ Work in order. Check boxes only after the criterion is met.
 
 ## Tertiary / optional (only after MVP)
 - [x] Add a small risk trend chart based on real stored events (Implemented in AnalyticsPage).
-- [ ] Add WebSockets only if polling is stable and there is spare time.
+- [x] Implement real-time transport interface (EventStreamService) with non-overlapping polling and event deduplication (Phase 4).
 
 ## Completion criteria
 Dashboard displays real backend events, shows explanations from backend, handles connection failures, labels replay data, and builds from documented instructions.

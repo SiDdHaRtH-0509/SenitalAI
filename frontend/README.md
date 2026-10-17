@@ -1,7 +1,7 @@
 # SentinelAI — Frontend Command Operations Dashboard (Lead 1)
 
 **Component Owner:** Lead 1 — Frontend Engineer  
-**Current Phase:** Phase 3 — Backend API Integration & Real-Time Security Data  
+**Current Phase:** Phase 4 — Real-Time Monitoring, Live Event Updates & Advanced Interactions  
 **Target Environment:** Localhost / IBM LinuxONE (s390x) Web Client  
 
 ---
@@ -72,7 +72,7 @@ The application will be served at:
 To typecheck and compile the production bundle:
 
 ```bash
-# Execute test suite (12 contract and integration test cases)
+# Execute test suite (32 contract, real-time, and integration test cases)
 npm test
 
 # Type check without emitting files
@@ -89,7 +89,31 @@ Production output is compiled into `frontend/dist/` in ~1.5 seconds with zero wa
 
 ---
 
-## 7. Backend API Integration & Architecture (Phase 3)
+## 7. Real-Time Telemetry & Event Monitoring Architecture (Phase 4)
+
+Phase 4 implements a decoupled real-time event ingestion and operator notification system built upon the `EventStreamService` interface.
+
+### Transport Strategy
+- **Preferred Order:** Server-Sent Events (SSE) $\rightarrow$ WebSockets $\rightarrow$ Controlled HTTP Polling $\rightarrow$ Integration Pending.
+- **Current Operational Reality:** Because the backend implementation is pending deployment by the Overall Lead, the frontend operates in **INTEGRATION_PENDING** mode with safe, non-overlapping polling fallback.
+- **Polling Configuration:** Respects `VITE_POLLING_INTERVAL_SEC` (default: 30s). A value of `0` cleanly disables background timers and activates manual-only refresh mode.
+- **Concurrency Locking:** Reusable `PollingEventStreamService` uses active request locking to eliminate overlapping HTTP requests when network latency exceeds polling frequency.
+
+### Security Notification Center
+- **Header Bell Indicator:** Dynamic badge displaying live unread counts (`aria-label`).
+- **Deduplication Engine:** Stable `notif-{event_id}` IDs guarantee events are never notified twice across repeated polls.
+- **Operator Review Tracking:** Browser-local read status persisted in `localStorage` without mutating server-side incident states.
+- **Operator Incident Inspection:** Direct modal trigger from notifications with full YOLOv8n detection telemetry and recommended actions.
+- **Audio Chime:** Gentle, opt-in synthesized chime via Web Audio API (zero external audio files).
+
+### Visual Feedback & Operator Workflow
+- **Row Arrival Glow:** Newly arrived events flash briefly with `.event-row-new` (respecting `prefers-reduced-motion`).
+- **Status Workflow:** Permitted transitions (`NEW` $\rightarrow$ `ACKNOWLEDGED` $\rightarrow$ `RESOLVED`) with honest offline feedback when the backend is unreachable.
+- **Camera Stream States:** Explicitly reports `STREAM_INTEGRATION_PENDING` or `CAMERA_DISCONNECTED` without fabricated CCTV video.
+
+---
+
+## 8. Backend API Integration & Architecture (Phase 3)
 
 Phase 3 introduces a centralized, typed, and resilient HTTP client layer (`src/services/apiClient.ts`) strictly mapped to `API_CONTRACT.md` v1.0.
 

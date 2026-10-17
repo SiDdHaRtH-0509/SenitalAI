@@ -35,6 +35,61 @@ export interface SecurityEvent {
   is_demo?: boolean;
 }
 
+// Global Connection State Enum per Section 6
+export type ConnectionState =
+  | 'CONNECTED'
+  | 'CONNECTING'
+  | 'RECONNECTING'
+  | 'DISCONNECTED'
+  | 'DEGRADED'
+  | 'UNKNOWN'
+  | 'INTEGRATION_PENDING';
+
+// Camera Stream State Enum per Section 12
+export type CameraStreamState =
+  | 'STREAM_CONNECTED'
+  | 'CONNECTING'
+  | 'STREAM_UNAVAILABLE'
+  | 'CAMERA_DISCONNECTED'
+  | 'STREAM_INTEGRATION_PENDING'
+  | 'UNKNOWN';
+
+// Operator Security Notification Item per Section 7
+export interface SecurityNotification {
+  id: string; // 'notif-' + event_id
+  event_id: string;
+  event_type: string;
+  timestamp: string;
+  camera_id: string;
+  zone_id?: string | null;
+  risk_level?: RiskLevel;
+  severity: SeverityLevel;
+  message: string;
+  read: boolean;
+  created_at: string;
+  is_demo: boolean;
+}
+
+// Real-Time Transport Payload per Section 4
+export interface StreamEventPayload {
+  type: 'EVENT_BATCH' | 'NEW_EVENT' | 'HEALTH_PING' | 'ERROR';
+  events?: SecurityEvent[];
+  event?: SecurityEvent;
+  stats?: DashboardStatistics;
+  timestamp: string;
+  message?: string;
+}
+
+// Small Reusable Transport Interface per Section 4
+export interface EventStreamService {
+  connect(): void;
+  disconnect(): void;
+  getConnectionState(): ConnectionState;
+  subscribe(callback: (payload: StreamEventPayload) => void): () => void;
+  refreshNow(): Promise<void>;
+  getLastUpdateTime(): string | null;
+}
+
 export type HealthStatusType = 'OPERATIONAL' | 'DEGRADED' | 'DISCONNECTED' | 'INTEGRATION_PENDING';
 
 export interface ServiceHealthItem {

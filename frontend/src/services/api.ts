@@ -7,6 +7,8 @@
  */
 
 export * from './apiClient';
+export * from './eventStreamService';
+export * from './notificationService';
 
 import {
   getHealth,

@@ -21,6 +21,10 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [x] Add loading, empty, stale, disconnected and error states.
 - [x] Add acknowledgement only if backend endpoint is agreed and implemented (PATCH /api/events/{id}/status wired with contract handling and offline simulation).
 - [x] Test with real API and document setup (12 contract and integration tests passing; live API verified in offline fallback pending backend deployment).
+- [x] Implement decoupled real-time event stream service (EventStreamService & PollingEventStreamService).
+- [x] Implement global connection status indicator and notification center with deduplication and local read tracking.
+- [x] Implement operator incident inspection and status workflow with integration pending notice.
+- [x] Implement 20 Phase 4 real-time monitoring and event update tests (32 total frontend tests passing).
 
 ## Lead 2 — Computer Vision
 - [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).

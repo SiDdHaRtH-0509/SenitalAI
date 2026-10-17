@@ -282,6 +282,55 @@
   background-color: var(--color-warning-bg);
   color: var(--color-warning);
   border: 1px solid var(--color-warning-border);
+  transition: all var(--transition-fast);
+}
+
+.system-status-pill.connected {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+  border-color: var(--color-success-border);
+}
+.system-status-pill.connected .status-pulse-dot {
+  background-color: var(--color-success);
+}
+
+.system-status-pill.connecting,
+.system-status-pill.reconnecting {
+  background-color: rgba(14, 165, 233, 0.12);
+  color: var(--color-accent-blue);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+.system-status-pill.connecting .status-pulse-dot,
+.system-status-pill.reconnecting .status-pulse-dot {
+  background-color: var(--color-accent-blue);
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+.system-status-pill.disconnected {
+  background-color: rgba(100, 116, 139, 0.15);
+  color: var(--color-text-muted);
+  border-color: rgba(100, 116, 139, 0.3);
+}
+.system-status-pill.disconnected .status-pulse-dot {
+  background-color: var(--color-text-dim);
+}
+
+.system-status-pill.degraded {
+  background-color: var(--color-critical-bg);
+  color: var(--color-critical);
+  border-color: var(--color-critical-border);
+}
+.system-status-pill.degraded .status-pulse-dot {
+  background-color: var(--color-critical);
+}
+
+.system-status-pill.integration-pending {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-color: var(--color-warning-border);
+}
+.system-status-pill.integration-pending .status-pulse-dot {
+  background-color: var(--color-warning);
 }
 
 .status-pulse-dot {
@@ -289,6 +338,19 @@
   height: 6px;
   border-radius: 50%;
   background-color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse-dot {
+    animation: none !important;
+  }
 }
 
 /* Notification Button & Dropdown */
@@ -305,6 +367,8 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  border: none;
+  cursor: pointer;
 }
 
 .icon-btn:hover {
@@ -314,25 +378,89 @@
 
 .notification-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
   background-color: var(--color-critical);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-bg-primary);
+  line-height: 1;
 }
 
 .notifications-popover {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 320px;
+  width: 360px;
+  max-height: 480px;
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   padding: var(--space-md);
   z-index: 200;
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 380px;
+  padding-right: 4px;
+}
+
+.notification-item {
+  padding: 10px 12px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.notification-item:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-focus);
+}
+
+.notification-item.unread {
+  border-left: 3px solid var(--color-accent-blue);
+  background-color: rgba(14, 165, 233, 0.05);
+}
+
+.notification-item.read {
+  opacity: 0.75;
+}
+
+/* Event Row Arrival Highlight */
+@keyframes row-highlight-pulse {
+  0% { background-color: rgba(14, 165, 233, 0.25); }
+  50% { background-color: rgba(14, 165, 233, 0.12); }
+  100% { background-color: transparent; }
+}
+
+.event-row-new {
+  animation: row-highlight-pulse 2.5s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-row-new {
+    animation: none !important;
+    border-left: 3px solid var(--color-accent-blue);
+  }
 }
 
 .popover-header {
