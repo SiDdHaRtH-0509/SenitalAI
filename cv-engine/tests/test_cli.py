@@ -81,6 +81,21 @@ class TestCVCLI(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_run_cli_replay_mode(self) -> None:
+        """Verify CLI executes deterministic replay mode and outputs structured summary."""
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            exit_code = run_cli(["--replay", "--disable-events", "--json", "--max-frames", "5"])
+            self.assertEqual(exit_code, 0)
+
+            output_str = mock_stdout.getvalue()
+            parsed_json = json.loads(output_str)
+            self.assertEqual(parsed_json["status"], "success")
+            self.assertTrue(parsed_json["replay_mode"])
+            self.assertEqual(parsed_json["model_type"], "replay")
+            self.assertEqual(parsed_json["frames_processed"], 5)
+            self.assertGreaterEqual(parsed_json["total_person_detections"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
+

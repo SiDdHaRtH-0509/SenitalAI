@@ -37,7 +37,7 @@ from sentinel_cv.models import (
     SecurityEvent,
     ZoneAnalysisResult,
 )
-from sentinel_cv.video_source import OpenCVVideoSource, VideoSourceError
+from sentinel_cv.video_source import OpenCVVideoSource, ReplayVideoSource, VideoSourceError, create_video_source
 from sentinel_cv.zone import ZoneAnalyzer
 
 logger = get_logger("pipeline")
@@ -101,11 +101,7 @@ class CVPipeline(ICVPipeline):
             CVPipeline: Configured pipeline with all active components.
         """
         cfg = config if config is not None else CVConfig.from_env()
-        source = OpenCVVideoSource(
-            source=cfg.video_source,
-            source_id=cfg.camera_id,
-            fallback_fps=cfg.target_fps,
-        )
+        source = create_video_source(cfg)
         detector = create_detector(cfg)
 
         zone_analyzer: Optional[IZoneAnalyzer] = None
@@ -179,6 +175,12 @@ class CVPipeline(ICVPipeline):
         )
 
         if self.detector is not None:
+            if hasattr(self.detector, "load_model") and not self.detector.is_ready():
+                try:
+                    self.detector.load_model()
+                except Exception as load_err:
+                    logger.error("Failed to load detector during pipeline initialization: %s", load_err)
+                    raise
             logger.info("Detector adapter attached: %s", type(self.detector).__name__)
         else:
             logger.info(
@@ -239,8 +241,12 @@ class CVPipeline(ICVPipeline):
                 f"metadata must be an instance of FrameMetadata, got {type(metadata).__name__}"
             )
 
-        if self.detector is not None and self.detector.is_ready():
-            detections = self.detector.detect(frame, metadata)
+        if self.detector is not None:
+            if not self.detector.is_ready() and hasattr(self.detector, "load_model"):
+                self.detector.load_model()
+
+            if self.detector.is_ready():
+                detections = self.detector.detect(frame, metadata)
             zone_results: List[ZoneAnalysisResult] = []
 
             # Evaluate zone incursions if zone analyzer is attached

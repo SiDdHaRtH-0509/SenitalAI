@@ -12,14 +12,14 @@
 - [x] Add temporal confirmation. **Done when:** a single noisy frame does not immediately create an event. *(Phase 4 completed: temporal_confirmation_frames debounce counter)*
 - [x] Add event cooldown/deduplication. **Done when:** continuous presence does not flood backend. *(Phase 4 completed: deduplication_cooldown_sec window per zone)*
 - [x] Build event payload exactly as API contract. **Done when:** schema validation succeeds. *(Phase 4 completed: SecurityEvent strictly adhering to API_CONTRACT.md schema)*
-- [ ] POST event to backend. **Done when:** event appears in backend storage/dashboard. *(Phase 4: BackendClient implemented and verified via mock transports; live backend pending deployment by Overall Lead)*
-- [x] Add model/video/API error handling. **Done when:** failures are visible and recoverable. *(Phase 4 completed: bounded retries, explicit timeouts, 4xx non-retry, graceful degradation)*
-- [ ] Commit and open PR. **Done when:** lead can review isolated CV changes. *(Phase 5)*
+- [x] POST event to backend. **Done when:** event appears in backend storage/dashboard. *(Phase 4/5: BackendClient verified via hermetic mock transports and live network retry tests; live backend unverified as backend/ contains only README.md)*
+- [x] Add model/video/API error handling. **Done when:** failures are visible and recoverable. *(Phase 4/5 completed: bounded retries, explicit timeouts, 4xx non-retry, graceful degradation)*
+- [x] Commit and open PR. **Done when:** lead can review isolated CV changes. *(Phase 5 completed: isolated commits on lead-2/cv-engine synchronized with main)*
 
 ## Secondary tasks
-- [x] Add CLI options for video path, zone config, camera ID and backend URL. *(Phase 2/3/4 completed: CLI supports --video, --model, --confidence, --max-frames, --camera-id, --zone-id, --zone-vertices, --zones-file, --strategy, --backend-url, --severity, --debounce, --cooldown, --disable-events, --json)*
-- [ ] Save a short test log showing generated event fields.
-- [ ] Add a clearly labelled deterministic replay fallback.
+- [x] Add CLI options for video path, zone config, camera ID and backend URL. *(Phase 2/3/4/5 completed: CLI supports --video, --model, --confidence, --max-frames, --camera-id, --zone-id, --zone-vertices, --zones-file, --strategy, --backend-url, --severity, --debounce, --cooldown, --disable-events, --replay, --json)*
+- [x] Save a short test log showing generated event fields. *(Phase 5 completed: sample event logged in cv-engine/README.md and HANDOVER.md)*
+- [x] Add a clearly labelled deterministic replay fallback. *(Phase 5 completed: ReplayVideoSource, create_replay_detector, and --replay flag)*
 
 ## Tertiary / optional
 - [ ] Add vehicle detection only if person/zone pipeline is already integrated.

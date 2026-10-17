@@ -265,3 +265,143 @@ class OpenCVVideoSource(IVideoSource):
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context manager, releasing the video source."""
         self.close()
+
+
+class ReplayVideoSource(IVideoSource):
+    """Deterministic synthetic video source for replay demonstration and fallback testing.
+
+    Generates synthetic video frames without requiring external video files, codecs,
+    or camera hardware. 100% compatible with headless environments and IBM LinuxONE.
+    """
+
+    def __init__(
+        self,
+        total_frames: int = 10,
+        fps: float = 10.0,
+        width: int = 1280,
+        height: int = 720,
+        source_id: str = "replay-stream-01",
+    ) -> None:
+        if total_frames < 1:
+            raise ValueError(f"total_frames must be >= 1, got {total_frames}")
+        if fps <= 0.0 or not math.isfinite(fps):
+            raise ValueError(f"fps must be a positive finite number, got {fps}")
+        if width <= 0 or height <= 0:
+            raise ValueError("width and height must be positive integers")
+
+        self._total_frames = total_frames
+        self._fps = float(fps)
+        self._width = int(width)
+        self._height = int(height)
+        self.source_id = source_id
+
+        self._is_opened = False
+        self._frame_count = 0
+
+    @property
+    def fps(self) -> float:
+        return self._fps
+
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @property
+    def height(self) -> int:
+        return self._height
+
+    @property
+    def total_frames(self) -> int:
+        return self._total_frames
+
+    @property
+    def frames_read(self) -> int:
+        return self._frame_count
+
+    def open(self) -> bool:
+        self._is_opened = True
+        self._frame_count = 0
+        logger.info(
+            "Opened ReplayVideoSource: %s | Dimensions: %sx%s | FPS: %.2f | Frames: %d",
+            self.source_id,
+            self._width,
+            self._height,
+            self._fps,
+            self._total_frames,
+        )
+        return True
+
+    def read_frame(self) -> Tuple[bool, Optional[Any], Optional[FrameMetadata]]:
+        if not self._is_opened:
+            if not self.open():
+                return False, None, None
+
+        if self._frame_count >= self._total_frames:
+            logger.info("ReplayVideoSource reached total frames limit (%d).", self._total_frames)
+            return False, None, None
+
+        elapsed_sec = float(self._frame_count) / self._fps
+        meta = FrameMetadata(
+            frame_index=self._frame_count,
+            timestamp=elapsed_sec,
+            width=self._width,
+            height=self._height,
+            source_id=self.source_id,
+        )
+
+        try:
+            import numpy as np
+            frame = np.zeros((self._height, self._width, 3), dtype=np.uint8)
+        except ImportError:
+            frame = f"synthetic_frame_{self._frame_count}"
+
+        self._frame_count += 1
+        return True, frame, meta
+
+    def close(self) -> None:
+        self._is_opened = False
+        logger.debug("Closed ReplayVideoSource: %s", self.source_id)
+
+    def is_opened(self) -> bool:
+        return self._is_opened
+
+    def __enter__(self) -> "ReplayVideoSource":
+        self.open()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
+
+def create_video_source(config: Any) -> IVideoSource:
+    """Factory creating an IVideoSource based on CVConfig.
+
+    If input_source_type is 'replay' or replay_mode is active and the video file
+    does not exist locally, falls back to ReplayVideoSource.
+
+    Args:
+        config: CVConfig containing video configuration.
+
+    Returns:
+        IVideoSource: Instantiated video source adapter.
+    """
+    is_replay = getattr(config, "input_source_type", "file") == "replay" or (
+        getattr(config, "replay_mode", False) and not os.path.exists(getattr(config, "video_source", ""))
+    )
+
+    if is_replay:
+        logger.info("Initializing ReplayVideoSource for deterministic replay fallback.")
+        return ReplayVideoSource(
+            total_frames=10,
+            fps=getattr(config, "target_fps", 10.0),
+            width=getattr(config, "target_width", 1280) or 1280,
+            height=getattr(config, "target_height", 720) or 720,
+            source_id=getattr(config, "camera_id", "cam-demo-01"),
+        )
+
+    return OpenCVVideoSource(
+        source=getattr(config, "video_source", "sample-data/demo.mp4"),
+        source_id=getattr(config, "camera_id", "cam-demo-01"),
+        fallback_fps=getattr(config, "target_fps", 25.0),
+    )
+
