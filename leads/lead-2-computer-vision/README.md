@@ -22,3 +22,8 @@ Own video input, detector integration, zone logic and structured event productio
 
 ## Done when
 A sample video produces an event accepted by the backend, or a clearly labelled replay fallback uses the same event contract if model runtime is blocked.
+
+## Current Progress
+- **Phase 1 (CV Engine Foundation):** Completed. Established modular structure in `cv-engine/`, configuration with strict validation, structured logging, validated data models (`BoundingBox`, `Detection`, `FrameMetadata`, `PipelineResult`), component interfaces (`IVideoSource`, `IDetector`, `IZoneAnalyzer`, `ICVPipeline`), pipeline orchestrator, and 41 passing automated tests.
+- **Phase 2 (Video Ingestion & Detection Adapter):** Pending authorization.
+
