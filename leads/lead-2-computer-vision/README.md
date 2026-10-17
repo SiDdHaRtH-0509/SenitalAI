@@ -26,5 +26,6 @@ A sample video produces an event accepted by the backend, or a clearly labelled 
 ## Current Progress
 - **Phase 1 (CV Engine Foundation):** Completed. Established modular structure in `cv-engine/`, configuration with strict validation, structured logging, validated data models (`BoundingBox`, `Detection`, `FrameMetadata`, `PipelineResult`), component interfaces (`IVideoSource`, `IDetector`, `IZoneAnalyzer`, `ICVPipeline`), pipeline orchestrator, and 41 passing automated tests.
 - **Phase 2 (Video Ingestion & Detection Adapter):** Completed. Implemented `OpenCVVideoSource` with safe fallback FPS and EOF detection, `YOLOPersonDetector` with strict COCO person class filtering and bounding box clamping, `MockPersonDetector` for offline testing, streaming generator `process_stream()`, `python -m sentinel_cv` CLI, and 68 passing automated unit tests.
-- **Phase 3 (Zone Logic & Temporal Confirmation):** Pending authorization.
+- **Phase 3 (Restricted-Zone Detection):** Completed. Implemented `PolygonZone` with Shoelace area calculation and axis-aligned bbox caching, pure Python Ray-Casting algorithm with boundary tolerance, ground-plane foot-contact reference point strategy (`bottom_center`), `ZoneAnalyzer` adapter, pipeline integration with incursion logging, CLI zone parameters, and 88 passing automated tests.
+- **Phase 4 (Event Generation & Backend Ingestion):** Pending authorization.
 

@@ -1,7 +1,7 @@
 """Shared Computer Vision data models for SentinelAI.
 
 Defines validated data structures for bounding boxes, detections, frame
-metadata, and pipeline outputs.
+metadata, zone analysis results, and pipeline outputs.
 
 Important architectural boundary:
 Detector confidence reflects the statistical certainty of the visual detector
@@ -199,26 +199,104 @@ class FrameMetadata:
 
 
 @dataclass(frozen=True)
+class ZoneAnalysisResult:
+    """Structured assessment of a detected person against a restricted zone.
+
+    Attributes:
+        detection: Source Detection instance.
+        frame_index: Sequence frame index.
+        timestamp: Elapsed video timestamp in seconds.
+        zone_id: Stable identifier of the evaluated zone.
+        zone_name: Human-readable name of the evaluated zone.
+        is_inside: True if detection reference point is inside/on the zone boundary.
+        reference_point: (x, y) coordinates evaluated (e.g. bottom-center).
+        detection_confidence: Statistical confidence of the visual detector.
+    """
+
+    detection: Detection
+    frame_index: int
+    timestamp: float
+    zone_id: str
+    zone_name: str
+    is_inside: bool
+    reference_point: Tuple[float, float]
+    detection_confidence: float
+
+    def __post_init__(self) -> None:
+        """Validate zone analysis result fields."""
+        if not isinstance(self.frame_index, int) or isinstance(self.frame_index, bool) or self.frame_index < 0:
+            raise ValueError(f"frame_index must be a non-negative integer, got {self.frame_index}")
+
+        if (
+            not isinstance(self.timestamp, (int, float))
+            or isinstance(self.timestamp, bool)
+            or not math.isfinite(self.timestamp)
+            or self.timestamp < 0.0
+        ):
+            raise ValueError(f"timestamp must be a non-negative finite number, got {self.timestamp}")
+
+        if not self.zone_id or not str(self.zone_id).strip():
+            raise ValueError("zone_id must be a non-empty string.")
+
+        if not isinstance(self.reference_point, tuple) or len(self.reference_point) != 2:
+            raise ValueError(f"reference_point must be a 2-tuple of (x, y), got {self.reference_point}")
+
+        rx, ry = self.reference_point
+        if not (math.isfinite(rx) and math.isfinite(ry)):
+            raise ValueError(f"reference_point coordinates must be finite numbers, got {self.reference_point}")
+
+        if (
+            not isinstance(self.detection_confidence, (int, float))
+            or isinstance(self.detection_confidence, bool)
+            or not math.isfinite(self.detection_confidence)
+            or not (0.0 <= float(self.detection_confidence) <= 1.0)
+        ):
+            raise ValueError(f"detection_confidence must be in [0.0, 1.0], got {self.detection_confidence}")
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize zone analysis result to dictionary."""
+        return {
+            "zone_id": self.zone_id,
+            "zone_name": self.zone_name,
+            "is_inside": self.is_inside,
+            "frame_index": self.frame_index,
+            "timestamp": round(float(self.timestamp), 3),
+            "reference_point": (round(self.reference_point[0], 2), round(self.reference_point[1], 2)),
+            "detection_confidence": round(float(self.detection_confidence), 4),
+            "detection": self.detection.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
 class PipelineResult:
     """Predictable container for pipeline frame processing results.
 
     Attributes:
         metadata: FrameMetadata associated with the frame.
         detections: Tuple of Detection instances found in the frame.
+        zone_results: Tuple of ZoneAnalysisResult instances for the frame.
         processed: Whether the frame was actively analyzed.
         status_message: Informative status or diagnostic message.
     """
 
     metadata: FrameMetadata
     detections: Tuple[Detection, ...] = field(default_factory=tuple)
+    zone_results: Tuple[ZoneAnalysisResult, ...] = field(default_factory=tuple)
     processed: bool = False
     status_message: str = "Initialized"
+
+    @property
+    def inside_zone_results(self) -> Tuple[ZoneAnalysisResult, ...]:
+        """Return only the zone results where detections are actively inside a zone."""
+        return tuple(r for r in self.zone_results if r.is_inside)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize pipeline result to dictionary."""
         return {
             "metadata": self.metadata.to_dict(),
             "detections": [d.to_dict() for d in self.detections],
+            "zone_results": [z.to_dict() for z in self.zone_results],
+            "inside_zone_count": len(self.inside_zone_results),
             "processed": self.processed,
             "status_message": self.status_message,
         }

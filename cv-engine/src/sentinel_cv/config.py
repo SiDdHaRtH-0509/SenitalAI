@@ -6,12 +6,14 @@ actionable error messages.
 """
 
 from dataclasses import dataclass, field
+import json
 import math
 import os
-from typing import Optional, Set
+from typing import Any, List, Optional, Set, Tuple
 
 VALID_INPUT_SOURCE_TYPES: Set[str] = {"file", "camera", "stream", "replay"}
 VALID_LOG_LEVELS: Set[str] = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+VALID_REF_STRATEGIES: Set[str] = {"bottom_center", "center"}
 
 
 class ConfigurationError(ValueError):
@@ -36,13 +38,19 @@ class CVConfig:
     # Logging
     log_level: str = "INFO"
 
-    # Future phase placeholders: Detector settings (Phase 2+)
+    # Detector settings (Phase 2)
     model_type: str = "placeholder"
     model_path: Optional[str] = None
     confidence_threshold: float = 0.50
 
-    # Future phase placeholders: Zone & Event settings (Phase 3+)
+    # Zone & Event settings (Phase 3)
     zone_id: str = "zone-restricted-01"
+    zone_name: str = "Restricted Zone 01"
+    zone_vertices: Optional[Tuple[Tuple[float, float], ...]] = None
+    zones_json: Optional[str] = None
+    reference_point_strategy: str = "bottom_center"
+
+    # Deduplication & Debounce placeholders (Phase 3/4)
     deduplication_cooldown_sec: float = 5.0
     temporal_confirmation_frames: int = 3
     replay_mode: bool = False
@@ -59,7 +67,6 @@ class CVConfig:
                 f"Invalid input_source_type '{self.input_source_type}'. "
                 f"Must be one of: {sorted(VALID_INPUT_SOURCE_TYPES)}"
             )
-        # Note: object.__setattr__ needed because dataclass is frozen
         object.__setattr__(self, "input_source_type", normalized_source_type)
 
         # 2. Validate video source
@@ -109,7 +116,21 @@ class CVConfig:
                 f"confidence_threshold must be a finite float between 0.0 and 1.0, got: {self.confidence_threshold}"
             )
 
-        # 8. Validate deduplication cooldown
+        # 8. Validate zone settings
+        if not self.zone_id or not str(self.zone_id).strip():
+            raise ConfigurationError("zone_id must be a non-empty string.")
+        if not self.zone_name or not str(self.zone_name).strip():
+            raise ConfigurationError("zone_name must be a non-empty string.")
+
+        normalized_strategy = self.reference_point_strategy.strip().lower()
+        if normalized_strategy not in VALID_REF_STRATEGIES:
+            raise ConfigurationError(
+                f"Invalid reference_point_strategy '{self.reference_point_strategy}'. "
+                f"Must be one of: {sorted(VALID_REF_STRATEGIES)}"
+            )
+        object.__setattr__(self, "reference_point_strategy", normalized_strategy)
+
+        # 9. Validate deduplication cooldown
         if (
             not isinstance(self.deduplication_cooldown_sec, (int, float))
             or isinstance(self.deduplication_cooldown_sec, bool)
@@ -120,7 +141,7 @@ class CVConfig:
                 f"deduplication_cooldown_sec must be a non-negative finite number, got: {self.deduplication_cooldown_sec}"
             )
 
-        # 9. Validate temporal confirmation frames
+        # 10. Validate temporal confirmation frames
         if (
             not isinstance(self.temporal_confirmation_frames, int)
             or isinstance(self.temporal_confirmation_frames, bool)
@@ -130,9 +151,56 @@ class CVConfig:
                 f"temporal_confirmation_frames must be an integer >= 1, got: {self.temporal_confirmation_frames}"
             )
 
-        # 10. Validate backend URL
+        # 11. Validate backend URL
         if not self.backend_url or not str(self.backend_url).strip():
             raise ConfigurationError("backend_url must be a non-empty string URL.")
+
+    def get_configured_zones(self) -> List[Any]:
+        """Resolve and instantiate PolygonZone instances from configuration.
+
+        Returns:
+            List[PolygonZone]: List of configured restricted zones.
+        """
+        from sentinel_cv.zone import PolygonZone
+
+        # Priority 1: Explicit JSON list of zones
+        if self.zones_json and self.zones_json.strip():
+            try:
+                data = json.loads(self.zones_json)
+                if isinstance(data, list):
+                    return [PolygonZone.from_dict(item) for item in data]
+                if isinstance(data, dict):
+                    return [PolygonZone.from_dict(data)]
+            except Exception as json_err:
+                raise ConfigurationError(f"Failed to parse CV_ZONES_JSON: {json_err}") from json_err
+
+        # Priority 2: Custom zone_vertices tuple
+        if self.zone_vertices is not None:
+            return [
+                PolygonZone(
+                    zone_id=self.zone_id,
+                    name=self.zone_name,
+                    vertices=self.zone_vertices,
+                    enabled=True,
+                )
+            ]
+
+        # Priority 3: Default synthetic restricted zone for 1280x720 frame
+        # (Illustrative polygon covering center-bottom buffer area)
+        default_vertices = (
+            (300.0, 300.0),
+            (980.0, 300.0),
+            (980.0, 700.0),
+            (300.0, 700.0),
+        )
+        return [
+            PolygonZone(
+                zone_id=self.zone_id,
+                name=self.zone_name,
+                vertices=default_vertices,
+                enabled=True,
+            )
+        ]
 
     @classmethod
     def from_env(cls) -> "CVConfig":
@@ -170,6 +238,9 @@ class CVConfig:
             model_path=os.getenv("CV_MODEL_PATH") or None,
             confidence_threshold=parsed_conf,
             zone_id=os.getenv("CV_ZONE_ID", "zone-restricted-01"),
+            zone_name=os.getenv("CV_ZONE_NAME", "Restricted Zone 01"),
+            zones_json=os.getenv("CV_ZONES_JSON") or None,
+            reference_point_strategy=os.getenv("CV_REFERENCE_POINT_STRATEGY", "bottom_center"),
             deduplication_cooldown_sec=parsed_cooldown,
             temporal_confirmation_frames=parsed_temporal,
             replay_mode=parsed_replay,

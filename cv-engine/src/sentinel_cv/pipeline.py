@@ -1,12 +1,14 @@
 """Pipeline orchestration module for SentinelAI Computer Vision Engine.
 
-Connects video acquisition, frame metadata generation, and object detector
-evaluation into an incremental, streaming processing pipeline.
+Connects video acquisition, frame metadata generation, object detector
+evaluation, and restricted-zone spatial analysis into an incremental,
+streaming processing pipeline.
 
-Phase 2 capabilities:
+Phase 3 capabilities:
 - Incremental frame extraction via OpenCVVideoSource.
 - Validated FrameMetadata generation.
 - Person detection via IDetector (YOLOPersonDetector / MockPersonDetector).
+- Restricted-zone spatial intersection via IZoneAnalyzer (ZoneAnalyzer).
 - Streaming generator process_stream() preventing buffering frames in memory.
 - Optional max_frames processing limits for controlled evaluation.
 - Clean resource reclamation on EOF, limit reached, or exception.
@@ -16,10 +18,11 @@ from typing import Any, Iterator, List, Optional, Tuple
 
 from sentinel_cv.config import CVConfig, ConfigurationError
 from sentinel_cv.detector import create_detector
-from sentinel_cv.interfaces import ICVPipeline, IDetector, IVideoSource
+from sentinel_cv.interfaces import ICVPipeline, IDetector, IVideoSource, IZoneAnalyzer
 from sentinel_cv.logging_config import get_logger, setup_logging
-from sentinel_cv.models import Detection, FrameMetadata, PipelineResult
+from sentinel_cv.models import Detection, FrameMetadata, PipelineResult, ZoneAnalysisResult
 from sentinel_cv.video_source import OpenCVVideoSource, VideoSourceError
+from sentinel_cv.zone import ZoneAnalyzer
 
 logger = get_logger("pipeline")
 
@@ -27,8 +30,8 @@ logger = get_logger("pipeline")
 class CVPipeline(ICVPipeline):
     """Computer vision pipeline orchestrator for SentinelAI.
 
-    Coordinates video stream ingestion, object detection, and structured
-    result production.
+    Coordinates video stream ingestion, object detection, restricted-zone analysis,
+    and structured result production.
     """
 
     def __init__(
@@ -36,6 +39,7 @@ class CVPipeline(ICVPipeline):
         config: Optional[CVConfig] = None,
         video_source: Optional[IVideoSource] = None,
         detector: Optional[IDetector] = None,
+        zone_analyzer: Optional[IZoneAnalyzer] = None,
     ) -> None:
         """Initialize the pipeline with configuration and optional components.
 
@@ -43,10 +47,12 @@ class CVPipeline(ICVPipeline):
             config: CVConfig instance. If None, loads defaults from environment.
             video_source: Video source adapter (e.g. OpenCVVideoSource).
             detector: Object detector adapter (e.g. YOLOPersonDetector).
+            zone_analyzer: Spatial zone analyzer (e.g. ZoneAnalyzer).
         """
         self.config: CVConfig = config if config is not None else CVConfig.from_env()
         self.video_source: Optional[IVideoSource] = video_source
         self.detector: Optional[IDetector] = detector
+        self.zone_analyzer: Optional[IZoneAnalyzer] = zone_analyzer
 
         self._is_initialized: bool = False
         self._is_running: bool = False
@@ -56,15 +62,17 @@ class CVPipeline(ICVPipeline):
         cls,
         config: Optional[CVConfig] = None,
         auto_init: bool = True,
+        enable_zone_analyzer: bool = True,
     ) -> "CVPipeline":
         """Factory creating a fully wired pipeline from configuration.
 
         Args:
             config: CVConfig instance or None to read environment.
             auto_init: If True, calls initialize() before returning.
+            enable_zone_analyzer: If True, configures and attaches ZoneAnalyzer.
 
         Returns:
-            CVPipeline: Configured pipeline with video source and detector.
+            CVPipeline: Configured pipeline with video source, detector, and zone analyzer.
         """
         cfg = config if config is not None else CVConfig.from_env()
         source = OpenCVVideoSource(
@@ -74,7 +82,20 @@ class CVPipeline(ICVPipeline):
         )
         detector = create_detector(cfg)
 
-        pipeline = cls(config=cfg, video_source=source, detector=detector)
+        zone_analyzer: Optional[IZoneAnalyzer] = None
+        if enable_zone_analyzer:
+            zones = cfg.get_configured_zones()
+            zone_analyzer = ZoneAnalyzer(
+                zones=zones,
+                reference_point_strategy=cfg.reference_point_strategy,
+            )
+
+        pipeline = cls(
+            config=cfg,
+            video_source=source,
+            detector=detector,
+            zone_analyzer=zone_analyzer,
+        )
         if auto_init:
             pipeline.initialize()
         return pipeline
@@ -126,6 +147,11 @@ class CVPipeline(ICVPipeline):
                 "is scheduled for Phase 2."
             )
 
+        if self.zone_analyzer is not None:
+            logger.info("Zone analyzer attached: %s", type(self.zone_analyzer).__name__)
+        else:
+            logger.debug("No zone analyzer attached.")
+
         self._is_initialized = True
         return True
 
@@ -137,7 +163,7 @@ class CVPipeline(ICVPipeline):
             metadata: Associated FrameMetadata.
 
         Returns:
-            PipelineResult: Structured processing result.
+            PipelineResult: Structured processing result with detections and zone evaluations.
 
         Raises:
             RuntimeError: If called before pipeline is initialized.
@@ -153,16 +179,27 @@ class CVPipeline(ICVPipeline):
 
         if self.detector is not None and self.detector.is_ready():
             detections = self.detector.detect(frame, metadata)
+            zone_results: List[ZoneAnalysisResult] = []
+
+            # Evaluate zone incursions if zone analyzer is attached
+            if self.zone_analyzer is not None and detections:
+                zone_results = self.zone_analyzer.evaluate(detections, metadata)
+
+            inside_count = sum(1 for z in zone_results if z.is_inside)
+            status_msg = f"Detected {len(detections)} object(s) ({inside_count} inside restricted zone)."
+
             return PipelineResult(
                 metadata=metadata,
                 detections=tuple(detections),
+                zone_results=tuple(zone_results),
                 processed=True,
-                status_message=f"Detected {len(detections)} object(s).",
+                status_message=status_msg,
             )
 
         return PipelineResult(
             metadata=metadata,
             detections=tuple(),
+            zone_results=tuple(),
             processed=False,
             status_message=(
                 "Phase 1 Foundation: Detector not attached. "
@@ -205,6 +242,7 @@ class CVPipeline(ICVPipeline):
 
         frames_processed = 0
         total_detections = 0
+        total_zone_incursions = 0
 
         try:
             if not self.video_source.is_opened():
@@ -226,21 +264,24 @@ class CVPipeline(ICVPipeline):
                 result = self.process_frame(frame, metadata)
                 frames_processed += 1
                 total_detections += len(result.detections)
+                total_zone_incursions += len(result.inside_zone_results)
 
                 if frames_processed % progress_interval == 0:
                     logger.info(
-                        "Progress: Processed %d frames | Cumulative Person Detections: %d",
+                        "Progress: Processed %d frames | Person Detections: %d | Zone Incursions: %d",
                         frames_processed,
                         total_detections,
+                        total_zone_incursions,
                     )
 
                 yield result
         finally:
             self.stop()
             logger.info(
-                "Video processing finished. Total frames processed: %d | Total person detections: %d",
+                "Video processing finished. Total frames processed: %d | Person detections: %d | Zone incursions: %d",
                 frames_processed,
                 total_detections,
+                total_zone_incursions,
             )
 
     def run(self, max_frames: Optional[int] = None) -> List[PipelineResult]:

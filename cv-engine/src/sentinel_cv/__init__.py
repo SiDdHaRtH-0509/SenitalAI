@@ -1,10 +1,10 @@
 """SentinelAI Computer Vision Engine (Lead 2).
 
 Intelligent Video Analytics Platform for Border Surveillance.
-Phase 2: Video Processing & Person Detection.
+Phase 3: Restricted-Zone Detection.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from sentinel_cv.config import CVConfig, ConfigurationError
 from sentinel_cv.detector import (
@@ -25,9 +25,11 @@ from sentinel_cv.models import (
     Detection,
     FrameMetadata,
     PipelineResult,
+    ZoneAnalysisResult,
 )
 from sentinel_cv.pipeline import CVPipeline
 from sentinel_cv.video_source import OpenCVVideoSource, VideoSourceError
+from sentinel_cv.zone import PolygonZone, ZoneAnalyzer
 
 __all__ = [
     "__version__",
@@ -45,8 +47,11 @@ __all__ = [
     "ModelLoadingError",
     "OpenCVVideoSource",
     "PipelineResult",
+    "PolygonZone",
     "VideoSourceError",
     "YOLOPersonDetector",
+    "ZoneAnalysisResult",
+    "ZoneAnalyzer",
     "create_detector",
     "get_logger",
     "setup_logging",
