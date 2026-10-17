@@ -23,6 +23,7 @@ Statuses: `TODO`, `IN PROGRESS`, `BLOCKED`, `DONE`. Update only based on real wo
 - [ ] Test with real API and document setup.
 
 ## Lead 2 — Computer Vision
+- [x] Establish CV engine foundation (config, models, interfaces, logging, unit tests).
 - [ ] Confirm sample video authorization and format.
 - [ ] Test OpenCV and selected pretrained detector in available environment.
 - [ ] Implement video reader and configured zone.

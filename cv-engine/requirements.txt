@@ -1,0 +1,20 @@
+# SentinelAI CV Engine - Phase 1 Dependencies
+# ====================================================
+# Phase 1 is the CV Engine Foundation.
+# It strictly relies on the Python standard library:
+#   - dataclasses, typing, logging, math, os, abc, json
+#
+# No external ML packages, heavy frameworks, or native
+# C-extensions (such as OpenCV, PyTorch, Ultralytics, ONNX Runtime)
+# are required for Phase 1.
+#
+# This ensures 100% pure-Python architecture neutrality across:
+#   - x86-64 development machines
+#   - ARM64
+#   - IBM LinuxONE (s390x)
+#
+# Optional development / test runner:
+# The test suite runs out-of-the-box with Python's standard unittest:
+#   python -m unittest discover -s tests -p "test_*.py"
+# If running via pytest, pytest may optionally be installed:
+# pytest>=7.0.0
