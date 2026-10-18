@@ -415,11 +415,25 @@ export async function getSecurityEvents(
       statusCode: 200,
     };
   } catch (err: unknown) {
-    const errText = err instanceof ApiClientError ? err.message : 'Backend offline';
+    const apiError = err instanceof ApiClientError ? err : null;
+    const errText = apiError?.message ?? 'Unexpected backend error';
+
+    // Authentication/authorization failures mean the API responded; they do not
+    // mean the backend is offline. Avoid presenting synthetic records as real data.
+    if (apiError?.status === 401 || apiError?.status === 403) {
+      return {
+        data: [],
+        isLive: false,
+        statusCode: apiError.status,
+        error: `Live events require an authorized session (${apiError.status}). Sign in with an account permitted to view events.`,
+      };
+    }
+
     return {
-      data: DEMO_EVENTS,
+      data: DEMO_EVENTS.map((event) => ({ ...event, is_demo: true })),
       isLive: false,
-      error: `GET /api/events unavailable (${errText}). Displaying demonstration audit fixtures.`,
+      statusCode: apiError?.status,
+      error: `GET /api/events unavailable (${errText}). Showing clearly marked demonstration fixtures; these are not live incidents.`,
     };
   }
 }
@@ -658,10 +672,11 @@ export async function getSystemHealth(signal?: AbortSignal): Promise<SystemHealt
     },
     database: {
       ...INITIAL_SYSTEM_HEALTH.database,
-      status: probe.isConnected ? 'OPERATIONAL' : 'DISCONNECTED',
-      label: probe.isConnected ? 'Operational' : 'Not Connected',
+      status: 'INTEGRATION_PENDING',
+      label: 'Not Independently Verified',
+      description: 'The API heartbeat does not test database connectivity. Database status remains unverified until a dedicated database health probe is available.',
       lastChecked: new Date().toLocaleTimeString(),
-      latencyMs: probe.isConnected ? 2 : null,
+      latencyMs: null,
     },
     dashboard: {
       ...INITIAL_SYSTEM_HEALTH.dashboard,

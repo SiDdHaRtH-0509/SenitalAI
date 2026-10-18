@@ -161,10 +161,10 @@ export const EventsPage: React.FC<EventsPageProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Info size={15} />
             <span>
-              <strong>Demonstration Records Active:</strong> The FastAPI backend endpoint (<code>GET /api/events</code>) is offline. Displaying {events.length} synthetic audit fixtures matching <code>API_CONTRACT.md</code> v1.0.
+              <strong>Live Events Not Verified:</strong> The event request did not return an authorized live dataset. Displaying {events.length} fallback records, if any; these records are synthetic and must not be treated as real incidents.
             </span>
           </div>
-          <span className="badge badge-warning">OFFLINE FALLBACK</span>
+          <span className="badge badge-warning">FALLBACK DATA</span>
         </div>
       )}
 
