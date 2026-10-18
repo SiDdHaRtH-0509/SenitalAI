@@ -73,13 +73,13 @@ export const AppShell: React.FC<AppShellProps> = ({
                 </span>
               ) : (
                 <>
-                  {DEMO_DATA_NOTICE}. Real-time monitoring engine active in offline demonstration fallback mode.
+                  {DEMO_DATA_NOTICE}. The live event feed has not been verified in this session; any fallback records are synthetic and must not be treated as real incidents.
                 </>
               )}
             </span>
           </div>
           <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-            Status: {isLive ? 'Backend Live' : 'Offline / Demonstration Mode'}
+            Status: {isLive ? 'Live Event Feed' : 'Live Feed Not Verified'}
           </span>
         </div>
 
