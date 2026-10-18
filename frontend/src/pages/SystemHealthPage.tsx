@@ -79,7 +79,7 @@ export const SystemHealthPage: React.FC<SystemHealthPageProps> = ({ health, onRe
       >
         <Info size={16} />
         <span>
-          <strong>Honest System Telemetry:</strong> Services are marked Operational only when active HTTP heartbeat responses are verified. Because the FastAPI backend is not yet deployed, backend and database services are truthfully reported as <strong>Not Connected</strong>.
+          <strong>Honest System Telemetry:</strong> Services are marked Operational only when active HTTP heartbeat responses are verified. Backend and database status are determined by the latest verified health probes; demo data is identified separately.
         </span>
       </div>
 
@@ -246,7 +246,7 @@ export const SystemHealthPage: React.FC<SystemHealthPageProps> = ({ health, onRe
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--color-text-muted)' }}>Connection Probe:</span>
-              <span style={{ color: 'var(--color-critical)', fontFamily: 'var(--font-mono)' }}>ERR_CONNECTION_REFUSED</span>
+              <span style={{ color: health.backend_api.status === 'OPERATIONAL' ? 'var(--color-success)' : 'var(--color-critical)', fontFamily: 'var(--font-mono)' }}>{health.backend_api.status === 'OPERATIONAL' ? 'HTTP HEALTH CHECK PASSED' : 'BACKEND UNREACHABLE'}</span>
             </div>
           </div>
 

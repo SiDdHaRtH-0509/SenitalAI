@@ -148,9 +148,9 @@ class OpenCVVideoSource(IVideoSource):
 
         # Query container properties
         get_prop = getattr(self._cap, "get", None)
-        if callable(get_prop) and cv2 is not None:
+        if callable(get_prop):
             try:
-                raw_fps = float(get_prop(cv2.CAP_PROP_FPS))
+                raw_fps = float(get_prop(5))
                 if math.isfinite(raw_fps) and raw_fps > 0.0:
                     self._fps = raw_fps
                 else:
@@ -161,9 +161,9 @@ class OpenCVVideoSource(IVideoSource):
                     )
                     self._fps = self.fallback_fps
 
-                self._width = int(get_prop(cv2.CAP_PROP_FRAME_WIDTH))
-                self._height = int(get_prop(cv2.CAP_PROP_FRAME_HEIGHT))
-                self._total_frames = int(get_prop(cv2.CAP_PROP_FRAME_COUNT))
+                self._width = int(get_prop(3))
+                self._height = int(get_prop(4))
+                self._total_frames = int(get_prop(7))
             except Exception as prop_err:
                 logger.warning("Could not read video container properties: %s", prop_err)
                 self._fps = self.fallback_fps

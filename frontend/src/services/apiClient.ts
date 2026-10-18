@@ -36,7 +36,7 @@ import {
 } from '../data/demoData';
 
 // Configurable environment defaults
-const DEFAULT_BASE_URL = 'http://localhost:8000';
+const DEFAULT_BASE_URL = 'http://127.0.0.1:8001';
 const DEFAULT_TIMEOUT_MS = 5000;
 
 export function getApiBaseUrl(): string {
@@ -658,10 +658,11 @@ export async function getSystemHealth(signal?: AbortSignal): Promise<SystemHealt
     },
     database: {
       ...INITIAL_SYSTEM_HEALTH.database,
-      status: probe.isConnected ? 'OPERATIONAL' : 'DISCONNECTED',
-      label: probe.isConnected ? 'Operational' : 'Not Connected',
+      status: 'INTEGRATION_PENDING',
+      label: 'Not Verified',
+      description: 'Database connectivity has not been independently verified by a database health probe.',
       lastChecked: new Date().toLocaleTimeString(),
-      latencyMs: probe.isConnected ? 2 : null,
+      latencyMs: null,
     },
     dashboard: {
       ...INITIAL_SYSTEM_HEALTH.dashboard,
