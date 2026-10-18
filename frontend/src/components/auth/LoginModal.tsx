@@ -39,6 +39,7 @@ interface LoginModalProps {
   currentUser: UserProfile | null;
   onAuthSuccess: (user: UserProfile) => void;
   onLogoutSuccess: () => void;
+  requireAuth?: boolean;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
@@ -47,7 +48,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   currentUser,
   onAuthSuccess,
   onLogoutSuccess,
+  requireAuth = false,
 }) => {
+  const isGated = requireAuth || !currentUser;
   const [mode, setMode] = useState<'login' | 'signup'>('login');
 
   // Login form state
@@ -214,7 +217,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         padding: '1rem',
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!isGated && e.target === e.currentTarget) onClose();
       }}
     >
       <div
@@ -222,9 +225,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           width: '100%',
           maxWidth: '460px',
           backgroundColor: '#0f172a',
-          border: '1px solid #1e293b',
+          border: isGated ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid #1e293b',
           borderRadius: '12px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+          boxShadow: isGated
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 25px rgba(56, 189, 248, 0.15)'
+            : '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
@@ -260,29 +265,69 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
             <div>
               <h2 id="auth-modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600 }}>
-                SentinelAI Security Access
+                {isGated ? 'SentinelAI Security Gateway' : 'SentinelAI Security Access'}
               </h2>
               <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                Identity, RBAC Authentication & Operator Onboarding
+                {isGated
+                  ? 'Authentication Required — Please Sign In or Register'
+                  : 'Identity, RBAC Authentication & Operator Onboarding'}
               </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close dialog"
+          {!isGated ? (
+            <button
+              onClick={onClose}
+              aria-label="Close dialog"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                display: 'flex',
+                padding: '6px',
+                borderRadius: '6px',
+              }}
+            >
+              <X size={18} />
+            </button>
+          ) : (
+            <div
+              style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                borderRadius: '4px',
+                padding: '3px 8px',
+                fontSize: '0.68rem',
+                color: '#38bdf8',
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+              }}
+            >
+              LOCKED
+            </div>
+          )}
+        </div>
+
+        {/* Gated Security Notice Banner */}
+        {isGated && (
+          <div
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              cursor: 'pointer',
+              backgroundColor: 'rgba(56, 189, 248, 0.08)',
+              borderBottom: '1px solid rgba(56, 189, 248, 0.2)',
+              padding: '8px 16px',
               display: 'flex',
-              padding: '6px',
-              borderRadius: '6px',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.76rem',
+              color: '#38bdf8',
             }}
           >
-            <X size={18} />
-          </button>
-        </div>
+            <Lock size={13} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Perimeter Operations Gated:</strong> Authenticate or create an account to unlock CCTV feeds and live telemetry.
+            </span>
+          </div>
+        )}
 
         {/* Mode Switcher Tabs */}
         <div

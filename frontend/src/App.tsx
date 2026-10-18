@@ -42,7 +42,6 @@ import {
   INITIAL_SYSTEM_HEALTH,
   DEMO_CAMERAS,
   DEFAULT_CLIENT_SETTINGS,
-  DEMO_OPERATOR_USER,
 } from './data/demoData';
 
 // Map between URL hash/paths and NavigationPage keys
@@ -95,20 +94,26 @@ export const App: React.FC = () => {
   const [highlightedEventIds, setHighlightedEventIds] = useState<Set<string>>(new Set());
   const [inspectedEvent, setInspectedEvent] = useState<SecurityEvent | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+  // Check if an authenticated user session is cached in local storage
+  const getStoredUser = (): UserProfile | null => {
     if (typeof window !== 'undefined' && window.localStorage) {
       const cached = window.localStorage.getItem('sentinel_auth_user');
       if (cached) {
         try {
-          return JSON.parse(cached);
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.username) {
+            return parsed;
+          }
         } catch {
           // ignore
         }
       }
     }
-    return DEMO_OPERATOR_USER;
-  });
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    return null;
+  };
+
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(getStoredUser);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => !getStoredUser());
 
   const highlightTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -116,11 +121,12 @@ export const App: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     getCurrentUserProfile().then((res) => {
-      if (isMounted && res.data) {
+      if (isMounted && res.data && res.isLive) {
         setCurrentUser(res.data);
+        setIsLoginModalOpen(false);
       }
     }).catch(() => {
-      // Keep demo fallback
+      // Keep unauthenticated / gated state
     });
     return () => {
       isMounted = false;
@@ -397,7 +403,16 @@ export const App: React.FC = () => {
       currentUser={currentUser}
       onOpenLoginModal={() => setIsLoginModalOpen(true)}
     >
-      {renderActivePage()}
+      <div
+        style={{
+          filter: !currentUser ? 'blur(4px)' : 'none',
+          pointerEvents: !currentUser ? 'none' : 'auto',
+          transition: 'filter 0.25s ease',
+          userSelect: !currentUser ? 'none' : 'auto',
+        }}
+      >
+        {renderActivePage()}
+      </div>
 
       {/* Global Event Detail Modal (when triggered via notifications or direct inspect) */}
       <EventDetailModal
@@ -409,15 +424,21 @@ export const App: React.FC = () => {
       {/* Identity & Access Login Modal */}
       <LoginModal
         isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+        onClose={() => {
+          if (currentUser) {
+            setIsLoginModalOpen(false);
+          }
+        }}
         currentUser={currentUser}
+        requireAuth={!currentUser}
         onAuthSuccess={(user) => {
           setCurrentUser(user);
+          setIsLoginModalOpen(false);
           loadData();
         }}
         onLogoutSuccess={() => {
-          setCurrentUser(DEMO_OPERATOR_USER);
-          loadData();
+          setCurrentUser(null);
+          setIsLoginModalOpen(true);
         }}
       />
     </AppShell>

@@ -437,21 +437,25 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             className="user-avatar"
             aria-hidden="true"
             style={{
-              backgroundColor: currentUser?.role === 'ADMIN' ? '#7e22ce' : '#0284c7',
+              backgroundColor: currentUser
+                ? currentUser.role === 'ADMIN'
+                  ? '#7e22ce'
+                  : '#0284c7'
+                : '#475569',
               color: '#ffffff',
               fontWeight: 700,
             }}
           >
-            {currentUser ? (currentUser.role === 'ADMIN' ? 'AD' : 'OP') : 'OP'}
+            {currentUser ? (currentUser.role === 'ADMIN' ? 'AD' : 'OP') : '??'}
           </div>
           <div className="user-meta">
             <span className="user-name">
-              {currentUser ? currentUser.username : 'Operator 04'}
+              {currentUser ? currentUser.username : 'Not Authenticated'}
             </span>
             <span className="user-role">
               {currentUser
                 ? `${currentUser.role === 'ADMIN' ? 'Administrator' : 'Watch Officer'} (${currentUser.role})`
-                : 'Watch Officer (Demo)'}
+                : 'Click to Sign In / Up'}
             </span>
           </div>
         </div>
