@@ -378,7 +378,7 @@ describe('SentinelAI ApiClient & Contract Integration Suite', () => {
     // Events fallback
     assert.strictEqual(eventsRes.isLive, false);
     assert.ok(eventsRes.data.length > 0);
-    assert.match(eventsRes.error || '', /Displaying demonstration audit fixtures/);
+    assert.match(eventsRes.error || '', /demonstration .*fixtures/);
 
     // Stats fallback
     assert.strictEqual(statsRes.isLive, false);

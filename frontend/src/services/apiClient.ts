@@ -743,6 +743,36 @@ export async function loginUser(
 }
 
 /**
+ * 9.1 User Registration (POST /api/auth/register)
+ */
+export async function registerUser(
+  username: string,
+  password: string,
+  fullName?: string,
+  email?: string
+): Promise<ApiResponse<UserProfile>> {
+  try {
+    const user = await apiClient.post<UserProfile>('/api/auth/register', {
+      username: username.trim().toLowerCase(),
+      password,
+      full_name: fullName?.trim() || null,
+      email: email?.trim() || null,
+    });
+    return {
+      data: user,
+      isLive: true,
+      statusCode: 201,
+    };
+  } catch (err: unknown) {
+    const errMsg = err instanceof ApiClientError ? err.message : 'Registration failed';
+    throw new ApiClientError(errMsg, {
+      status: err instanceof ApiClientError ? err.status : 400,
+      details: err,
+    });
+  }
+}
+
+/**
  * 10. Logout (POST /api/auth/logout or local token clearance)
  */
 export async function logoutUser(): Promise<void> {

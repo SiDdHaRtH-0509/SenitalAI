@@ -17,6 +17,7 @@ import {
   ApiClientError,
   apiClient,
   loginUser,
+  registerUser,
   logoutUser,
   getCurrentUserProfile,
 } from '../src/services/apiClient';
@@ -198,5 +199,36 @@ describe('SentinelAI Frontend Authentication & RBAC Suite', () => {
 
     await client.post('/api/events/evt-01/status', { status: 'RESOLVED' });
     assert.strictEqual(capturedCsrfHeader, 'csrf-secret-token-777');
+  });
+
+  test('9. registerUser successfully posts registration and returns UserProfile', async () => {
+    let capturedBody: any;
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/auth/register')) {
+        capturedBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            id: 10,
+            username: capturedBody.username,
+            role: 'OPERATOR',
+            full_name: capturedBody.full_name,
+            email: capturedBody.email,
+            is_active: true,
+            created_at: '2026-10-18T10:00:00Z',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response('Not found', { status: 404 });
+    };
+
+    const res = await registerUser('new_guard', 'securepass123', 'Officer New Guard', 'guard@sentinel.local');
+    assert.strictEqual(res.isLive, true);
+    assert.strictEqual(res.statusCode, 201);
+    assert.strictEqual(res.data.username, 'new_guard');
+    assert.strictEqual(res.data.role, 'OPERATOR');
+    assert.strictEqual(capturedBody.username, 'new_guard');
+    assert.strictEqual(capturedBody.password, 'securepass123');
   });
 });
