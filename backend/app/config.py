@@ -88,7 +88,7 @@ class Settings:
         # CORS origins: comma-separated list of allowed frontend hosts
         cors_raw = os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
+            "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173",
         )
         self.CORS_ORIGINS: List[str] = [
             origin.strip() for origin in cors_raw.split(",") if origin.strip()

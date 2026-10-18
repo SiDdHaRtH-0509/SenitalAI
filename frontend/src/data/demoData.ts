@@ -41,7 +41,7 @@ export const DEMO_ADMIN_USER: UserProfile = {
 };
 
 export const IS_DEMO_MODE = true;
-export const DEMO_DATA_NOTICE = 'DEMO DATA — For UI Layout & Evaluation Only';
+export const DEMO_DATA_NOTICE = 'DEMONSTRATION FALLBACK DATA — Synthetic records only';
 
 export const DEFAULT_CLIENT_SETTINGS: ClientSettings = {
   table_density: 'comfortable',
@@ -283,10 +283,10 @@ export const INITIAL_SYSTEM_HEALTH: SystemHealthState = {
     name: 'FastAPI Backend API',
     status: 'DISCONNECTED',
     label: 'Not Connected',
-    description: 'API endpoint http://localhost:8000/api/health is currently unreachable.',
+    description: 'Backend health must be checked against the configured API endpoint; this fixture is demonstration-only.',
     lastChecked: 'Just now',
     details: 'Awaiting implementation and deployment by Overall Lead',
-    endpoint: 'http://localhost:8000/api/health',
+    endpoint: 'Configured backend API health endpoint',
     latencyMs: null,
   },
   database: {
