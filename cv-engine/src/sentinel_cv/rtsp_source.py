@@ -253,16 +253,16 @@ class RTSPVideoSource(IVideoSource):
 
         # Query container / stream properties
         get_prop = getattr(self._cap, "get", None)
-        if callable(get_prop) and cv2 is not None:
+        if callable(get_prop):
             try:
-                raw_fps = float(get_prop(cv2.CAP_PROP_FPS))
+                raw_fps = float(get_prop(5))
                 if math.isfinite(raw_fps) and raw_fps > 0.0:
                     self._fps = raw_fps
                 else:
                     self._fps = self.fallback_fps
 
-                w = int(get_prop(cv2.CAP_PROP_FRAME_WIDTH))
-                h = int(get_prop(cv2.CAP_PROP_FRAME_HEIGHT))
+                w = int(get_prop(3))
+                h = int(get_prop(4))
                 if w > 0 and h > 0:
                     self._width = w
                     self._height = h

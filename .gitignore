@@ -43,3 +43,4 @@ sample-data/*.mov
 Thumbs.db
 .vscode/
 .idea/
+/runtime-logs/

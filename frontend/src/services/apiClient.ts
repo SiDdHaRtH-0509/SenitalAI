@@ -36,7 +36,7 @@ import {
 } from '../data/demoData';
 
 // Configurable environment defaults
-const DEFAULT_BASE_URL = 'http://localhost:8000';
+const DEFAULT_BASE_URL = 'http://127.0.0.1:8001';
 const DEFAULT_TIMEOUT_MS = 5000;
 
 export function getApiBaseUrl(): string {
